@@ -1,5 +1,7 @@
 #!/usr/bin/python3
 
+import misc
+
 from math import sqrt, gcd
 from dataclasses import dataclass
 
@@ -52,7 +54,7 @@ class Quadratic:
         b = self.b
         q = self.q
         # In leiu of a proper factorisation...
-        for p in 2, 3, 5, 7, 11, 13, 17, 19, 23, 29:
+        for p in misc.tiny_primes:
             pp = p * p
             while b % pp == 0:
                 b //= pp

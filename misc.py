@@ -77,7 +77,7 @@ if __name__ == '__main__':
     for p in range(3,400,2):
         if p == 2:
             continue
-        S = 0
+        S = 0j
         for k in range(1, p):
             S += jacobi(k, p) * cmath.rect(1, 2 * k * cmath.pi / p)
         print(p, rc(S*S), rc(S / sqrt(p)))

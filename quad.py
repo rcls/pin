@@ -1,4 +1,4 @@
-from misc import small_primes
+from misc import small_primes, jacobi
 
 from dataclasses import dataclass
 from typing import Optional
@@ -24,7 +24,7 @@ class Quad:
 
     def is_qr(self, n: int) -> bool:
         # Only valid if p really is prime!
-        return self.p == 2 || misc.jacobi(n, p) >= 0
+        return self.p == 2 or jacobi(n, self.p) >= 0
 
     def non_residue(self) -> int:
         p = self.p
@@ -34,7 +34,7 @@ class Quad:
         for nr in small_primes:
             if nr == p:
                 continue                # Useless.
-            j = misc.jaboci(nr, p)
+            j = jacobi(nr, p)
             assert j != 0, f'{p} is not prime, factor {j}'
             if j == -1:
                 self._non_residue = nr
