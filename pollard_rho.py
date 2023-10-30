@@ -82,8 +82,7 @@ def is_prime(N: int) -> bool:
                 break                   # Not a generator.
         else:
             factors.sort()
-            print(f'{N} is prime gen {x} N-1 factors', ' '.join(
-                str(f) for f in factors))
+            #print(f'{N} is prime gen {x} N-1 factors', ' '.join(str(f) for f in factors))
             return True
     assert False, 'Oops, failed to certify {N}'
 
@@ -102,8 +101,7 @@ def unique_prime_factors(N: int, verbose=True) -> Generator[int, None, None]:
             remain = g
             factor = f
         for p in unique_prime_factors(factor, False):
-            if False and verbose:
-                print(f'{N} has factor {p}')
+            #print(f'{N} has factor {p}')
             yield p
             while remain % p == 0:
                 remain //= p

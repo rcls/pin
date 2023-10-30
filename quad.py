@@ -1,4 +1,6 @@
 from misc import small_primes
+
+from dataclasses import dataclass
 from typing import Optional
 
 class Quad:
@@ -8,7 +10,8 @@ class Quad:
     _non_residue: Optional[int]
     _square_chain: Optional[list[int]] = []
 
-    def __init__(self, p, non_residue=None):
+    def __init__(self, p: int, non_residue: Optional[int] = None):
+        # TODO - how to fail if p<2.
         self.p = p
         self._non_residue = non_residue
         Q = p - 1
@@ -20,12 +23,8 @@ class Quad:
         self.Q = Q
 
     def is_qr(self, n: int) -> bool:
-        if self.p == 2 or n % self.p == 0:
-            return True
-        assert self.p & 1 == 1
-        r = pow(n, self.p >> 1, self.p)
-        assert r == 1 or r == self.p - 1
-        return r == 1
+        # Only valid if p really is prime!
+        return self.p == 2 || misc.jacobi(n, p) >= 0
 
     def non_residue(self) -> int:
         p = self.p
@@ -35,11 +34,11 @@ class Quad:
         for nr in small_primes:
             if nr == p:
                 continue                # Useless.
-            tp = pow(nr, p >> 1, p)
-            if p - tp == 1:
+            j = misc.jaboci(nr, p)
+            assert j != 0, f'{p} is not prime, factor {j}'
+            if j == -1:
                 self._non_residue = nr
                 return nr
-            assert tp == 1, f'{p} is not prime (Fermat fail)'
 
         assert False, f'Failed to find non-residue for {p}'
 
@@ -51,7 +50,7 @@ class Quad:
             self._square_chain.append(x * x % self.p)
         return self._square_chain[squares]
 
-    def sqrt(self, n: int) -> Optional[int]:
+    def maybe_sqrt(self, n: int) -> Optional[int]:
         p = self.p
         n = n % p
         if n == 0:
@@ -62,7 +61,7 @@ class Quad:
         assert self.Q & 1 == 1
 
         root = pow(n, (self.Q + 1) >> 1, p)  # Square root of something.
-        overshoot = pow(n, -1, p) * root % p * root % p
+        overshoot = pow(n, -1, p) * root % p * root % p # ≡ n^{Q+1} / n = n^Q.
         assert overshoot == pow(n, self.Q, p)
         twos = self.S - 1
         # From the fact that n is a q.r...
@@ -87,6 +86,94 @@ class Quad:
             assert root * root % p == overshoot * n % p
         return root
 
+    # Use at own risk, no checking...
+    def sqrt(self, n: int) -> int:
+        p = self.p
+        n = n % p
+        if n == 0:
+            return 0                    # Special case!
+
+        root = pow(n, (self.Q + 1) >> 1, p)  # Square root of something.
+        overshoot = pow(n, -1, p) * root % p * root % p # ≡ n^(Q+1)/n = n^Q.
+        twos = self.S - 1
+        while overshoot != 1:
+            raised = overshoot
+            # We should need a smaller value for twos on each iteration.
+            for twos in range(twos):
+                if p - raised == 1:
+                    break
+                raised = raised * raised % p
+            else:
+                assert False, 'Failed to steer...'
+
+            multiplier = self.square_chain(self.S - 2 - twos)
+            overshoot = overshoot * multiplier % p * multiplier % p
+            root = root * multiplier % p
+        return root
+
+    def qsqrt(self, n: int) -> 'QuadInt':
+        if self.is_qr(n):
+            return QuadInt(self.sqrt(n), 0, self)
+        else:
+            p, k = self.p, self.non_residue()
+            return QuadInt(0, self.sqrt(n * k) * pow(k, -1, p) % p, self)
+
+    def __str__(self) -> str:
+        if self._non_residue:
+            return f'√{self._non_residue} (mod {self.p})'
+        else:
+            return f'√� (mod {self.p})'
+
+@dataclass(frozen=True)
+class QuadInt:
+    # r + q√k
+    r: int
+    q: int
+    k: Quad
+    def __init__(self, r:int, q:int, k: Quad):
+        object.__setattr__(self, 'r', r % k.p)
+        object.__setattr__(self, 'q', q % k.p)
+        object.__setattr__(self, 'k', k)
+    def __add__(self, y: 'QuadInt') -> 'QuadInt':
+        assert self.k == y.k
+        return QuadInt(self.r + y.r, self.q + y.q, self.k)
+    def __sub__(self, y: 'QuadInt') -> 'QuadInt':
+        assert self.k == y.k
+        return QuadInt(self.r - y.r, self.q - y.q, self.k)
+    def __neg__(self) -> 'QuadInt':
+        return QuadInt(-self.r, -self.q, self.k)
+    def __mul__(self, y: 'QuadInt') -> 'QuadInt':
+        r, q, k = self.r, self.q, self.k
+        assert k == y.k
+        return QuadInt(r * y.r + q * y.q % k.p * k.non_residue(),
+                       r * y.q + q * y.r, k)
+    def invert(self) -> 'QuadInt':
+        # (r - q√k)(r² - q²k)⁻¹
+        r, q, p = self.r, self.q, self.k.p
+        modsq = r * r - q * q % p * self.k.non_residue()
+        invmodsq = pow(modsq, -1, p)
+        return QuadInt(r * invmodsq, -q * invmodsq, self.k)
+
+    def conjagate(self) -> 'QuadInt':
+        return QuadInt(self.r, -self.q, self.k)
+
+    def pow(self, n: int) -> 'QuadInt':
+        #print(f'Pow {self} {n}')
+        b = self
+        if n == 0:
+            return QuadInt(1, 0, self.k)
+        if n < 0:
+            b = b.invert()
+            n = -n
+        result = b
+        for i in reversed(range(n.bit_length() - 1)):
+            result *= result
+            if n & (1 << i):
+                result *= b
+        return result
+    def __str__(self) -> str:
+        return f'{self.r} + {self.q} {self.k}'
+
 if __name__ == '__main__':
     import sys
     if len(sys.argv) > 1:
@@ -94,23 +181,32 @@ if __name__ == '__main__':
         b = Quad(eval(bs))
         for s in sys.argv[1:-1]:
             v = eval(s)
-            print(f'sqrt({s}) mod {bs} = {b.sqrt(v)}')
+            print(f'sqrt({s}) mod {bs} = {b.maybe_sqrt(v)}')
     else:
         q137 = Quad(137)
+        print(f'{q137=!s}')
         print(f'{q137.is_qr(1)=}')
-        print(f'{q137.sqrt(1)=}')
-        print(f'{q137.sqrt(136)=}')
+        print(f'{q137.maybe_sqrt(1)=}')
+        print(f'{q137.maybe_sqrt(136)=}')
         print(f'{q137.is_qr(2)=}')
-        print(f'{q137.sqrt(2)=}')
+        print(f'{q137.maybe_sqrt(2)=}')
         print(f'{q137.is_qr(3)=}')
+        print(f'{q137=!s}')
         print(f'{Quad(139).is_qr(-1)=}')
         q12s64p1 = Quad((12 << 64) + 1)
-        print(f'{q12s64p1.sqrt(2)=}')
-        print(f'{q12s64p1.sqrt(3)=}')
-        print(f'{q12s64p1.sqrt(-3)=}')
-        print(f'{q12s64p1.sqrt(5)=}')
-        print(f'{q12s64p1.sqrt(-1)=}')
+        print(f'{q12s64p1.maybe_sqrt(2)=}')
+        print(f'{q12s64p1.maybe_sqrt(3)=}')
+        print(f'{q12s64p1.maybe_sqrt(-3)=}')
+        print(f'{q12s64p1.maybe_sqrt(5)=}')
+        print(f'{q12s64p1.maybe_sqrt(-1)=}')
+        print(q12s64p1)
 
         q3s64m1 = Quad((3 << 64) - 1)
-        print(f'{q3s64m1.sqrt(3)=}')
-        print(f'{q3s64m1.sqrt(-3)=}')
+        print(f'{q3s64m1.qsqrt(2)=!s}')
+        print(f'{q3s64m1.maybe_sqrt(3)=}')
+        def square(x): return x*x
+        print(f'{q3s64m1.qsqrt(-3)=!s}')
+        print(f'{-square(q3s64m1.qsqrt(-3))=!s}')
+        print(q3s64m1)
+        r = q3s64m1.p * q3s64m1.p - 1
+        print(f'{r:#x}', f'{QuadInt(3,4,q3s64m1).pow(r)=!r}')
