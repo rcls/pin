@@ -1,6 +1,6 @@
 
 from dataclasses import dataclass, field
-from typing import Union, Tuple
+from typing import Tuple
 
 @dataclass
 class Monic:

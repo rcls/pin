@@ -89,7 +89,9 @@ def strong_frobenius_a_star(n: int) -> bool:
     # Reject perfect squares, else the Jacobi test never passes!
     if n < 2 or misc.is_square(n):
         return False
-    for i in misc.small_primes_list[2:]:
+    for i in misc.small_primes:
+        if i <= 3:
+            continue
         if n == i:
             return True                 # We've tried all smaller odd numbers.
         if n % i == 0:
@@ -114,7 +116,7 @@ def strong_frobenius_a_star(n: int) -> bool:
     else:
         P = 1
         Q = (1 - D) // 4
-    print(f'{P=} {Q=} {D=}')
+    #print(f'{P=} {Q=} {D=}')
     return strong_frobenius(n, P, Q, D)
 
 if __name__ == '__main__':

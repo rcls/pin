@@ -1,18 +1,17 @@
 
 from math import gcd, sqrt
-from typing import Generator, Iterator
+import itertools
+from typing import Iterator
 
 tiny_primes = 2, 3, 5, 7, 11, 13, 17, 19
-small_primes = {
-    x for x in range(2, 500)
-    if x in tiny_primes or not any(x % p == 0 for p in tiny_primes)}
-small_primes_list = sorted(small_primes)
+small_primes = frozenset(itertools.chain(
+    tiny_primes,
+    (x for x in range(23, 500) if not any(x % p == 0 for p in tiny_primes))))
 
-def modest_primes() -> Iterator[int]:
-    yield from small_primes
-    for x in range(401, 250000, 2):
-        if not any(x % p == 0 for p in small_primes):
-            yield x
+modest_primes = frozenset(itertools.chain(
+    small_primes,
+    (x for x in range(501, 250000, 2)
+     if not any(x % p == 0 for p in small_primes))))
 
 def jacobi(a: int, n: int) -> int:
     assert n > 0 and n & 1 == 1         # Must be positive, odd.
@@ -45,7 +44,7 @@ def is_square(a: int) -> bool:
         return False
     if a < 2:
         return True
-    # Find the smallest power of two s such that s*s >= a.
+    # Find the smallest power of two such that s*s >= a.
     s = 2
     ssq = 4
     lower = 1
@@ -65,6 +64,9 @@ def is_square(a: int) -> bool:
     return ssq == a
 
 if __name__ == '__main__':
+    assert list(tiny_primes) == sorted(tiny_primes)
+    assert list(small_primes) == sorted(small_primes)
+
     for i in range(2000*0):
         assert is_square(i*i)
         for j in range(i*i + 1, (i+1)*(i+1)):
@@ -74,7 +76,7 @@ if __name__ == '__main__':
     def rc(c):
         s = 1048576
         return round(c.real*s)/s + round(c.imag*s)/s*1j
-    for p in range(3,400,2):
+    for p in range(3,500,2):
         if p == 2:
             continue
         S = 0j

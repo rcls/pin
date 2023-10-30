@@ -1,9 +1,9 @@
 
-from misc import small_primes, small_primes_list, tiny_primes
+from misc import small_primes, tiny_primes
 from pollard_rho import pollard_rho, unique_prime_factors
 
 from dataclasses import dataclass
-from typing import Generator, Iterator, Optional, NamedTuple
+from typing import Iterator, Optional, NamedTuple
 
 @dataclass
 class PrattCert:
@@ -65,7 +65,7 @@ def pratt_cert(N: int, cache: dict[int,PrattCert]) -> Optional[PrattCert]:
     if twos == 0:
         return None                     # N-1 is odd, N is even.
     cofactors = None
-    for x in small_primes_list:
+    for x in small_primes:
         x = x % N
         if x == 0:
             continue                    # Prime but we want a cert.
@@ -100,7 +100,7 @@ def pratt_cert(N: int, cache: dict[int,PrattCert]) -> Optional[PrattCert]:
 
     assert False, 'Oops, failed to certify {N}'
 
-def unique_prime_factor_certs(N: int, cache: dict[int, PrattCert]) -> Generator[PrattCert, None, None]:
+def unique_prime_factor_certs(N: int, cache: dict[int, PrattCert]) -> Iterator[PrattCert]:
     remain = N
     while remain > 1:
         cert = pratt_cert(remain, cache)

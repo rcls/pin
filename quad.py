@@ -185,23 +185,41 @@ if __name__ == '__main__':
     else:
         q137 = Quad(137)
         print(f'{q137=!s}')
-        print(f'{q137.is_qr(1)=}')
-        print(f'{q137.maybe_sqrt(1)=}')
-        print(f'{q137.maybe_sqrt(136)=}')
-        print(f'{q137.is_qr(2)=}')
-        print(f'{q137.maybe_sqrt(2)=}')
-        print(f'{q137.is_qr(3)=}')
+        assert q137.is_qr(1)
+        assert q137.maybe_sqrt(1) == 1
+        def square_sqrt(q, x):
+            s = q.maybe_sqrt(x)
+            assert s is not None
+            assert jacobi(x, q.p) >= 0
+            assert s == q.sqrt(x)
+            ss = s * s % q.p
+            assert ss == x % q.p
+            if s * 2 > q.p:
+                s -= q.p
+            return s
+
+        square_sqrt(q137, q137.maybe_sqrt(-1))
+        assert q137.is_qr(2)
+        assert square_sqrt(q137, 2)
+        assert jacobi(3, 137) == -1
+        assert not q137.is_qr(3)
+        assert q137.maybe_sqrt(3) == None
         print(f'{q137=!s}')
-        print(f'{Quad(139).is_qr(-1)=}')
+
+        assert not Quad(139).is_qr(-1)
+
         q12s64p1 = Quad((12 << 64) + 1)
-        print(f'{q12s64p1.maybe_sqrt(2)=}')
-        print(f'{q12s64p1.maybe_sqrt(3)=}')
-        print(f'{q12s64p1.maybe_sqrt(-3)=}')
-        print(f'{q12s64p1.maybe_sqrt(5)=}')
-        print(f'{q12s64p1.maybe_sqrt(-1)=}')
+        square_sqrt(q12s64p1, 2)
+        square_sqrt(q12s64p1, 3)
+        square_sqrt(q12s64p1, -3)
+        assert q12s64p1.maybe_sqrt(5) is None
+        assert jacobi(5, q12s64p1.p) == -1
+        square_sqrt(q12s64p1, -1)
         print(q12s64p1)
 
         q3s64m1 = Quad((3 << 64) - 1)
+        assert jacobi(2, q3s64m1.p)
+        square_sqrt(q3s64m1, 2)
         print(f'{q3s64m1.qsqrt(2)=!s}')
         print(f'{q3s64m1.maybe_sqrt(3)=}')
         def square(x): return x*x

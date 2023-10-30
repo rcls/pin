@@ -1,7 +1,7 @@
-from misc import tiny_primes, small_primes, small_primes_list
+from misc import tiny_primes, small_primes
 
 from math import gcd
-from typing import Generator
+from typing import Iterator
 
 def pollard_rho(N: int) -> int:
     # No attempt to behave sensibly if N is 1 or prime!
@@ -25,7 +25,7 @@ def pollard_rho(N: int) -> int:
                 return g
     assert False, f'Failed on {N}'
 
-def factor_repeats(N: int, factors: list[int]) -> Generator[int, None, None]:
+def factor_repeats(N: int, factors: list[int]) -> Iterator[int]:
     for f in factors:
         while N % f == 0:
             yield f
@@ -48,7 +48,7 @@ def is_prime(N: int) -> bool:
         twos += 1
     # N is odd.
     factors = None
-    for x in small_primes_list:
+    for x in small_primes:
         if x * x > N:
             return True              # If we get here we have found any factors.
         # Note that if x is a factor of N then x^(N-1) is not 1 mod N.  Check
@@ -86,7 +86,7 @@ def is_prime(N: int) -> bool:
             return True
     assert False, 'Oops, failed to certify {N}'
 
-def unique_prime_factors(N: int, verbose=True) -> Generator[int, None, None]:
+def unique_prime_factors(N: int, verbose=True) -> Iterator[int]:
     remain = N
     while remain > 1:
         if is_prime(remain):
