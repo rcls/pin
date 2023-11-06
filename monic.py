@@ -5,81 +5,88 @@ from typing import Tuple
 @dataclass
 class Monic:
     p: int
-    # x^order + ∑ c_k x^k = 0 where order = len(c)
+    # ∑ c_k x^k = 0, degree = len(c) -1 and c[degree] = 1.
     c: list[int]
-    order: int = 0
+    degree: int = 0
     small_pow: list[list[int]] = field(default_factory=list)
 
     def __post_init__(self):
-        self.order = len(self.c)
-        for i in range(self.order):
-            r = [0] * self.order
-            r[i] = 1
-            self.small_pow.append(r)
-        for _ in range(self.order, 2 * self.order):
+        assert self.c
+        assert self.c[-1] == 1
+        self.degree = len(self.c) - 1
+        for i in range(self.degree):
+            self.small_pow.append([0] * i + [1])
+
+        for _ in range(self.degree, 2 * self.degree):
             self.small_pow.append(self.multx(self.small_pow[-1]))
 
     def multx(self, ll: list[int]) -> list[int]:
+        if len(ll) < self.degree:
+            return [0] + ll
+
         h = ll[-1]
         r = [0] + ll[:-1]
-        for i in range(self.order):
+        for i in range(self.degree):
             r[i] = (r[i] - h * self.c[i]) % self.p
         return r
+
     def multx_in_place(self, ll: list[int]):
+        assert len(ll) == self.degree
         h = ll[-1]
-        for i in reversed(range(1, self.order)):
+        for i in reversed(range(1, self.degree)):
             ll[i] = (ll[i-1] - self.c[i] * h) % self.p
-        ll[0] = self.c[i] * h % self.p
+        ll[0] = self.c[0] * h % self.p
 
     def add(self, xx: list[int], yy: list[int]) -> list[int]:
-        assert len(xx) == self.order
-        assert len(yy) == self.order
-        return [(x + y) % self.p for x, y in zip(xx, yy)]
-    def sub(self, xx: list[int], yy: list[int]) -> list[int]:
-        assert len(xx) == self.order
-        assert len(yy) == self.order
-        return [(x - y) % self.p for x, y in zip(xx, yy)]
+        if len(xx) < len(yy):
+            xx, yy = yy, xx
+        r = list(xx)
+        for i, y in enumerate(yy):
+            r[i] = (r[i] + y) % self.p
+        return r
 
-    def add_in_place(self, xx: list[int], yy: list[int]):
-        assert len(xx) == self.order
-        assert len(yy) == self.order
-        for i in range(len(yy)):
-            xx[i] = (xx[i] + yy[i]) % self.p
+    def sub(self, xx: list[int], yy: list[int]) -> list[int]:
+        r = list(xx)
+        if len(r) < len(yy):
+            r.extend((0 for _ in range(len(yy) - len(r))))
+        for i, y in enumerate(yy):
+            r[i] = (r[i] - y) % self.p
+        return r
+
     def mac_in_place(self, xx: list[int], v: int, yy: list[int]):
-        assert len(xx) == self.order
-        assert len(yy) == self.order
-        for i in range(self.order):
-            xx[i] = (xx[i] + v * yy[i]) % self.p
+        assert len(yy) <= len(xx)
+        for i, y in enumerate(yy):
+            xx[i] = (xx[i] + v * y) % self.p
 
     def mult(self, xx: list[int], yy: list[int]) -> list[int]:
         # Multiply without reducing, then reduce.
         if xx == [] or yy == []:
             return []
         rr = [0] * (len(xx) + len(yy) - 1)
-        #assert len(rr) <= len(self.small_pow), f'{self.order} {len(xx)} {len(yy)} {len(self.small_pow)}'
+        #assert len(rr) <= len(self.small_pow), f'{self.degree} {len(xx)} {len(yy)} {len(self.small_pow)}'
         for i, x in enumerate(xx):
             for j, y in enumerate(yy):
                 rr[i + j] += x * y
-        if len(rr) <= self.order:
+        if len(rr) <= self.degree:
             for i, r in enumerate(rr):
                 rr[i] = r % self.p
             return rr
 
-        reduce = rr[:self.order]
-        for i in range(self.order, len(rr)):
-            self.mac_in_place(reduce, rr[i], self.small_pow[i]);
+        result = rr[:self.degree]
+        for i in range(self.degree, len(rr)):
+            self.mac_in_place(result, rr[i], self.small_pow[i]);
 
-        return reduce
+        return result
 
     def reduce(self, xx: list[int]) -> list[int]:
-        r = xx[:self.order]
-        if len(r) < self.order:
-            r += [0] * (self.order - len(r))
+        r = xx[:self.degree]
+        if len(r) < self.degree:
+            r += [0] * (self.degree - len(r))
             return r
-        for exp, v in enumerate(r[self.order:self.order*2], self.order):
+        for exp, v in enumerate(r[self.degree:self.degree*2], self.degree):
             self.mac_in_place(r, v, self.small_pow[exp])
         power = self.small_pow[-1]
-        for v in r[self.order*2:]:
+        for v in r[self.degree*2:]:
             self.multx_in_place(power)
             self.mac_in_place(r, v, power)
         return r
@@ -106,33 +113,33 @@ class Monic:
         return result
 
     def crack(self) -> list[int] | int | None:
-        if self.order <= 1:
+        if self.degree <= 1:
             return None
 
-        me = list(self.c)
-        me.append(1)
-        derivative = me[1:]
+        derivative = self.c[1:]
         for i, x in enumerate(derivative):
             derivative[i] = x * (i+1) % self.p
-        _, _, gcd = euclid(me, derivative, self.p)
+        _, _, gcd = euclid(self.c, derivative, self.p)
         if len(gcd) > 1:
             return gcd
 
-        # Try for gcd with X^{p^i} - X for 1 ≤ 2i ≤ order.
+        # Try for gcd with X^{p^i} - X for 1 ≤ 2i ≤ degree.
         X = self.small_pow[1];
         power = X                       # X¹ = X^p⁰
-        for i in range(1, (self.order + 2) >> 1):
-            power = self.pow(power, self.p)
+        # For even degree we need to try degree/2, for odd degree we need to
+        # try (degree-1)/2.
+        for i in range(1, (self.degree + 2) >> 1):
+            power = self.pow(power, self.p) # X^{2^i}
             poly = list(power)
             # FIXME poly == 0 is possible here, if we split into polynomials
-            # all of order i.
+            # all of degree i.
             poly[1] = (poly[1] - 1) % self.p
-            _, _, gcd = euclid(me, poly, self.p)
+            _, _, gcd = euclid(self.c, poly, self.p)
             if len(gcd) != 1:
-                if len(gcd) < self.order:
+                if len(gcd) < self.degree:
                     return gcd
                 else:
-                    assert self.order % i == 0
+                    assert self.degree % i == 0
                     return i
         return None
 
@@ -174,45 +181,51 @@ def poly_mult_scalar_in_place(xx: list[int], v: int, p: int):
 
 def poly_div_mod(rr: list[int], yy: list[int], p: int) -> list[int]:
     # rr is reduced in place, quotient is returned.
-    order = len(yy) - 1
-    if order < 0:
+    degree = len(yy) - 1
+    if degree < 0:
         raise ZeroDivisionError('polynomial division by zero')
-    while yy[order] == 0:
-        if order == 0:
+    while yy[degree] == 0:
+        if degree == 0:
             raise ZeroDivisionError('polynomial division by zero')
-        order -= 1
-    if len(rr) <= order:
+        degree -= 1
+    if len(rr) <= degree:
         return []
-    monica = pow(yy[order], -1, p)      # Possible div-by-zero!
-    result = [0] * (len(rr) - order)
+    monica = pow(yy[degree], -1, p)      # Possible div-by-zero!
+    result = [0] * (len(rr) - degree)
     for i in reversed(range(len(result))):
-        f = rr[i + order] * monica % p
+        f = rr[i + degree] * monica % p
         result[i] = f
-        rr[i + order] = 0
-        for j in range(order):
+        rr[i + degree] = 0
+        for j in range(degree):
             rr[i + j] = (rr[i + j] - f * yy[j]) % p
+    #del rr[degree:]
     return result
 
-def trim(xx: list[int]) -> list[int]:
-    if xx == [] or xx[-1]:
-        return xx
-    for order in reversed(range(len(xx) - 1)):
-        if xx[order]:
-            return xx[:order+1]
-    return []
+def trim(xx: list[int]):
+    if xx == []:
+        return
+
+    for degree in reversed(range(len(xx))):
+        if xx[degree]:
+            del xx[degree+1:]
+            return
+
+    del xx[:]
 
 def euclid(xx: list[int], yy: list[int], p: int) -> Tuple[
         list[int], list[int], list[int]]:
-    aa = trim(list(xx))
-    bb = trim(list(yy))
+    trim(xx)
+    trim(yy)
+    aa = list(xx)
+    bb = list(yy)
     k_a_x = [1]
     k_a_y: list[int] = []
     k_b_x: list[int] = []
     k_b_y = [1]
     while aa:
-        prev_bb = list(bb)
+        # prev_bb = list(bb)
         q = poly_div_mod(bb, aa, p)
-        bb = trim(bb)
+        trim(bb)
         # assert prev_bb == trim(poly_add(poly_mult(q, aa, p), bb, p))
         k_b_x = poly_sub(k_b_x, poly_mult(q, k_a_x, p), p)
         k_b_y = poly_sub(k_b_y, poly_mult(q, k_a_y, p), p)
@@ -229,17 +242,22 @@ def euclid(xx: list[int], yy: list[int], p: int) -> Tuple[
 if __name__ == '__main__':
     a = [1,1,1,1,1,1]
     b = [1,1,1]
+
     assert poly_sub(a, b, 3) == [0,0,0,1,1,1]
     assert poly_sub(b, a, 3) == [0,0,0,2,2,2]
 
     print(poly_mult([1,1,1], [1,-1,1], 5))
-    m = Monic(5, [1, 0, 1, 0]);
-    assert m.mult([1,1,1],[1,-1,1]) == [0,0,0,0]
-    assert m.crack() == 2               # Splits into 'unknown' order 2 factors.
 
-    assert Monic(7, [4,3,4]).crack() is None
-    assert Monic(7, [6,6,6,4]).crack() is None
+    m = Monic(11, [1, 0, 1, 0, 1])
+    for i in range(1, len(m.small_pow)):
+        assert m.small_pow[i] == m.multx(m.small_pow[i-1])
+    print(f'{m.mult([1,1,1],[1,-1,1])=}')
+    assert m.mult([1,1,1],[1,-1,1]) == [0,0,0,0]
+    assert m.crack() == 2              # Splits into 'unknown' degree 2 factors.
+
+    assert Monic(7, [4,3,4,1]).crack() is None
+    assert Monic(7, [6,6,6,4,1]).crack() is None
     print(poly_mult([4,3,4,1], [6,6,6,4,1], 7))
-    m = Monic(7, [3,0,3,1,4,4,1])
-    assert m.mult([4,3,4,1,0,0,0], [6,6,6,4,1,0,0]) == [0] * 7
+    m = Monic(7, [3,0,3,1,4,4,1,1])
+    assert m.mult([4,3,4,1], [6,6,6,4,1]) == [0] * 7
     assert m.crack() in ([4,3,4,1], [6,6,6,4,1])
