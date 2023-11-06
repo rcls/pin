@@ -147,15 +147,20 @@ class QuadInt:
         assert k == y.k
         return QuadInt(r * y.r + q * y.q % k.p * k.non_residue(),
                        r * y.q + q * y.r, k)
+    def square(self) -> 'QuadInt':
+        r, q, k = self.r, self.q, self.k
+        D = k.non_residue()
+        if D < 32:
+            return QuadInt(r * r + q * q * D, 2 * r * q, k)
+        else:
+            return QuadInt(r * r + q * q % k.p * D, 2 * r * q, k)
+
     def invert(self) -> 'QuadInt':
         # (r - q√k)(r² - q²k)⁻¹
         r, q, p = self.r, self.q, self.k.p
         modsq = r * r - q * q % p * self.k.non_residue()
         invmodsq = pow(modsq, -1, p)
         return QuadInt(r * invmodsq, -q * invmodsq, self.k)
-
-    def conjagate(self) -> 'QuadInt':
-        return QuadInt(self.r, -self.q, self.k)
 
     def pow(self, n: int) -> 'QuadInt':
         #print(f'Pow {self} {n}')
@@ -167,7 +172,7 @@ class QuadInt:
             n = -n
         result = b
         for i in reversed(range(n.bit_length() - 1)):
-            result *= result
+            result = result.square()
             if n & (1 << i):
                 result *= b
         return result
