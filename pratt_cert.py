@@ -92,14 +92,14 @@ def pratt_cert(N: int, cache: dict[int,PrattCert]) -> Optional[PrattCert]:
                 break                   #  Not a generator.
         else:
             cofactors.sort(key=lambda c: c.N)
-            print(f'{N} is prime gen {x} N-1 factors', ' '.join(
-                str(f.N) for f in cofactors))
+            # print(f'{N} is prime gen {x} N-1 factors', ' '.join(str(f.N) for f in cofactors))
             ret = PrattCert(N, True, x, cofactors)
             cache[N] = ret
             return ret
 
     assert False, 'Oops, failed to certify {N}'
 
+# Uses pollard rho.
 def unique_prime_factor_certs(N: int, cache: dict[int, PrattCert]) -> Iterator[PrattCert]:
     remain = N
     while remain > 1:
