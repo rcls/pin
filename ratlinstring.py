@@ -1,0 +1,85 @@
+
+from math import gcd
+from typing import Tuple
+from fractions import Fraction
+
+def rational(f: Fraction) -> str:
+    n, d = f.numerator, f.denominator
+
+    if d == 1:
+        return str(n)
+
+    s = '-' if n < 0 else '';
+    an = abs(n)
+    if an == 1 and d <= 10:
+        return s + '01½⅓¼⅕⅙⅐⅛⅑⅒'[d]
+    if an + 1 == d and d <= 7:
+        return '0½⅔¾⅘⅚'[an]
+    if d == 5 and an < 5:
+        return s + '0⅕⅖⅗⅘'[an]
+    if d == 8 and an < 8:
+        return s + '0⅛¼⅜½⅝¾⅞'[an]
+    return f'{n}/{d}'
+
+def ratlin_basic(a: Fraction, b: Fraction, k: str) -> str:
+    if b == 0:
+        return rational(a)
+
+    if abs(b.numerator) != 1:
+        bb = rational(abs(b))
+        if '/' in bb:
+            bbk = bb + ' × ' + k
+        else:
+            bbk = bb + ' ' + k
+    elif b.denominator == 1:
+        bbk = k
+    else:
+        bbk = k + '/' + str(b.denominator)
+
+    if a == 0:
+        return '-' + bbk if b < 0 else bbk
+
+    if a < 0 and b >= 0:
+        return bbk + ' - ' + rational(-a)
+
+    return rational(a) + (' + ' if b >= 0 else ' - ') + bbk
+
+def factorout(o: Fraction, a: Fraction, b: Fraction, k: str) -> str:
+    inner = ratlin_basic(a / o, b / o, k)
+    if '+' in inner or '-' in inner:
+        inner = '(' + inner + ')'
+
+    if o.numerator == 1:
+        return inner + '/' + str(o.denominator)
+    if o.numerator == -1:
+        return '-' + inner + '/' + str(o.denominator)
+
+    return rational(o) + ' ' + inner
+
+def ratlinstring(a: Fraction, b: Fraction, k: str) -> str:
+    # Format a + b × k in the most economical way.
+    # Try taking out various factors:
+    if a == 0 and b == 0:
+        return '0'                      # Avoids divide by zero.
+    an, ad = a.numerator, a.denominator
+    bn, bd = b.numerator, b.denominator
+    result = ratlin_basic(a, b, k)
+    for on in 1, an, bn, an * bn, gcd(an, bn), an * bn // gcd(an, bn):
+        for od in 1, ad, bd, ad * bd, gcd(ad, bd), ad * bd // gcd(ad, bd):
+            for son in on, -on:
+                if on != 0 and od != 0:
+                    attempt = factorout(Fraction(son, od), a, b, k)
+                    if len(attempt) < len(result):
+                        result = attempt
+    return result
+
+if __name__ == '__main__':
+    from sys import argv
+    if len(argv) == 2:
+        print(ratlinstring(Fraction(1), Fraction(1), 'φ'))
+    elif len(argv) == 3:
+        print(ratlinstring(Fraction(argv[1]), Fraction(argv[2]), 'φ'))
+    elif len(argv) == 3:
+        print(ratlinstring(Fraction(argv[1]), Fraction(argv[2]), argv[3]))
+    else:
+        print('One to three arguments please')
