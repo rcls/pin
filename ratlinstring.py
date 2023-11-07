@@ -1,9 +1,10 @@
 
 from math import gcd
 from typing import Tuple
+from numbers import Rational
 from fractions import Fraction
 
-def rational(f: Fraction) -> str:
+def rational(f: Rational) -> str:
     n, d = f.numerator, f.denominator
 
     if d == 1:
@@ -13,7 +14,7 @@ def rational(f: Fraction) -> str:
     an = abs(n)
     if an == 1 and d <= 10:
         return s + '01½⅓¼⅕⅙⅐⅛⅑⅒'[d]
-    if an + 1 == d and d <= 7:
+    if an + 1 == d and d < 7:
         return '0½⅔¾⅘⅚'[an]
     if d == 5 and an < 5:
         return s + '0⅕⅖⅗⅘'[an]
@@ -21,12 +22,12 @@ def rational(f: Fraction) -> str:
         return s + '0⅛¼⅜½⅝¾⅞'[an]
     return f'{n}/{d}'
 
-def ratlin_basic(a: Fraction, b: Fraction, k: str) -> str:
+def ratlin_basic(a: Rational, b: Rational, k: str) -> str:
     if b == 0:
         return rational(a)
 
     if abs(b.numerator) != 1:
-        bb = rational(abs(b))
+        bb = rational(Fraction(abs(b.numerator), abs(b.denominator)))
         if '/' in bb:
             bbk = bb + ' × ' + k
         else:
@@ -39,12 +40,12 @@ def ratlin_basic(a: Fraction, b: Fraction, k: str) -> str:
     if a == 0:
         return '-' + bbk if b < 0 else bbk
 
-    if a < 0 and b >= 0:
+    if a.numerator < 0 and b.numerator >= 0:
         return bbk + ' - ' + rational(-a)
 
-    return rational(a) + (' + ' if b >= 0 else ' - ') + bbk
+    return rational(a) + (' + ' if b.numerator >= 0 else ' - ') + bbk
 
-def factorout(o: Fraction, a: Fraction, b: Fraction, k: str) -> str:
+def factorout(o: Rational, a: Rational, b: Rational, k: str) -> str:
     inner = ratlin_basic(a / o, b / o, k)
     if '+' in inner or '-' in inner:
         inner = '(' + inner + ')'
@@ -56,7 +57,7 @@ def factorout(o: Fraction, a: Fraction, b: Fraction, k: str) -> str:
 
     return rational(o) + ' ' + inner
 
-def ratlinstring(a: Fraction, b: Fraction, k: str) -> str:
+def ratlinstring(a: Rational, b: Rational, k: str) -> str:
     # Format a + b × k in the most economical way.
     # Try taking out various factors:
     if a == 0 and b == 0:

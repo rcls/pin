@@ -3,7 +3,7 @@ from misc import small_primes, jacobi
 from dataclasses import dataclass
 from typing import Optional
 
-class Quad:
+class QuadRing:
     p: int                              # Should be odd prime
     S: int
     Q: int
@@ -129,8 +129,8 @@ class QuadInt:
     # r + q√k
     r: int
     q: int
-    k: Quad
-    def __init__(self, r:int, q:int, k: Quad):
+    k: QuadRing
+    def __init__(self, r:int, q:int, k: QuadRing):
         object.__setattr__(self, 'r', r % k.p)
         object.__setattr__(self, 'q', q % k.p)
         object.__setattr__(self, 'k', k)
@@ -183,12 +183,12 @@ if __name__ == '__main__':
     import sys
     if len(sys.argv) > 1:
         bs = sys.argv[-1]
-        b = Quad(eval(bs))
+        b = QuadRing(eval(bs))
         for s in sys.argv[1:-1]:
             v = eval(s)
             print(f'sqrt({s}) mod {bs} = {b.maybe_sqrt(v)}')
     else:
-        q137 = Quad(137)
+        q137 = QuadRing(137)
         print(f'{q137=!s}')
         assert q137.is_qr(1)
         assert q137.maybe_sqrt(1) == 1
@@ -211,9 +211,9 @@ if __name__ == '__main__':
         assert q137.maybe_sqrt(3) == None
         print(f'{q137=!s}')
 
-        assert not Quad(139).is_qr(-1)
+        assert not QuadRing(139).is_qr(-1)
 
-        q12s64p1 = Quad((12 << 64) + 1)
+        q12s64p1 = QuadRing((12 << 64) + 1)
         square_sqrt(q12s64p1, 2)
         square_sqrt(q12s64p1, 3)
         square_sqrt(q12s64p1, -3)
@@ -222,7 +222,7 @@ if __name__ == '__main__':
         square_sqrt(q12s64p1, -1)
         print(q12s64p1)
 
-        q3s64m1 = Quad((3 << 64) - 1)
+        q3s64m1 = QuadRing((3 << 64) - 1)
         assert jacobi(2, q3s64m1.p)
         square_sqrt(q3s64m1, 2)
         print(f'{q3s64m1.qsqrt(2)=!s}')

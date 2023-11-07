@@ -119,3 +119,13 @@ def unique_prime_factor_certs(N: int, cache: dict[int, PrattCert]) -> Iterator[P
             yield p
             while remain % p.N == 0:
                 remain //= p.N
+
+if __name__ == '__main__':
+    import sys
+    certs: dict[int, PrattCert] = {}
+    for s in sys.argv[1:]:
+        print(f'{s}:', ' '.join(
+            str(c.N) for c in unique_prime_factor_certs(int(s, 0), certs)))
+    for prime in sorted(certs.keys()):
+        cert = certs[prime]
+        print(prime, 'gen', cert.generator, 'co', ' '.join(str(c.N) for c in cert.cofactors))

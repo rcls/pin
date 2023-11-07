@@ -48,7 +48,7 @@ def strong_frobenius(n: int, P: int, Q: int, D: int) -> bool:
         halfP = (P + n) >> 1
     else:
         halfP = P >> 1
-    base = quad.QuadInt(halfP, (1 + n) >> 1, quad.Quad(n, D))
+    base = quad.QuadInt(halfP, (1 + n) >> 1, quad.QuadRing(n, D))
     #print('Lets check order', base, 'gets', base.pow(n+1))
     #print('Mod sq', base * base.conjagate())
     power = base.pow(d)
