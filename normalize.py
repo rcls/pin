@@ -5,14 +5,15 @@ from ratlinstring import ratlinstring
 
 from fractions import Fraction
 from math import sqrt, gcd
+from numbers import Rational
 from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class Quadratic:
     # r + q × √b
-    r: Fraction
-    q: Fraction
-    b: int
+    r: Rational
+    q: Rational = Fraction(0)
+    b: int = 5
     def reduce(self) -> 'Quadratic':
         b = self.b
         q = self.q
@@ -31,12 +32,14 @@ class Quadratic:
     def __sub__(self, y: 'Quadratic') -> 'Quadratic':
         assert self.b == y.b
         return Quadratic(self.r - y.r, self.q - y.q, self.b)
+    def __neg__(self) -> 'Quadratic':
+        return Quadratic(-self.r, -self.q, self.b)
     def __mul__(self, y: 'Quadratic') -> 'Quadratic':
         assert self.b == y.b
         return Quadratic(self.r * y.r + self.q * y.q * self.b,
                          self.r * y.q + self.q * y.r, self.b)
     def __bool__(self) -> bool:
-        return self.r != 0 and self.q != 0
+        return self.r != 0 or self.q != 0
     def invert(self) -> 'Quadratic':
         norm = (self.r * self.r) - self.q * self.q * self.b
         return Quadratic(self.r / norm, -self.q / norm, self.b)
@@ -46,12 +49,12 @@ class Quadratic:
         return Quadratic(self.r + Fraction(n), self.q, self.b)
     def multi(self, n: int) -> 'Quadratic':
         return Quadratic(self.r * n, self.q * n, self.b)
-    def __str__(self) -> str:
+    def __repr__(self) -> str:
         return ratlinstring(self.r, self.q, f'√{self.b}')
 
 # ax+b / cx+d
 @dataclass(frozen=True)
-class Rational:
+class Moïbus:
     a: int
     b: int
     c: int
@@ -60,22 +63,22 @@ class Rational:
         return (self.a * x + self.b) / (self.c * x + self.d)
     def applyi(self, n: int) -> Fraction:
         return Fraction(self.a * n + self.b, self.c * n + self.d)
-    def applyf(self, x: Fraction) -> Fraction:
+    def applyf(self, x: Rational) -> Fraction:
         return Fraction(self.a * x.numerator + self.b * x.denominator,
                         self.c * x.numerator + self.d * x.denominator)
     def applyq(self, x: Quadratic) -> Quadratic:
         return (x.multi(self.a).addi(self.b)) / \
             (x.multi(self.c).addi(self.d))
-    # We deal with determinate ±1 so no need to normalise...
-    def __mul__(self, y: 'Rational') -> 'Rational':
-        return Rational(self.a * y.a + self.b * y.c,
-                        self.a * y.b + self.b * y.d,
-                        self.c * y.a + self.d * y.c,
-                        self.c * y.b + self.d * y.d)
+    # We deal with determinant ±1 so no need to normalise...
+    def __mul__(self, y: 'Moïbus') -> 'Moïbus':
+        return Moïbus(self.a * y.a + self.b * y.c,
+                      self.a * y.b + self.b * y.d,
+                      self.c * y.a + self.d * y.c,
+                      self.c * y.b + self.d * y.d)
     def fixed_point(self) -> Quadratic:
-        # x = self(x).
-        # x = (ax + b) / (cx + d)
-        # c x² + (d - a)x - b = 0.
+        # Solve x = self(x).
+        # x = (a·x + b) / (cx + d)
+        # c·x² + (d - a)·x - b = 0.
         # Take +ve sqrt.
         ad = self.a - self.d
         common = gcd(ad, self.b * 2, self.c * 2)
@@ -95,15 +98,15 @@ class Rational:
     def __repr__(self) -> str:
         return f'({self.a}𝑥 + {self.b})/({self.c}𝑥 + {self.d})'
 
-def addconst(x: int) -> Rational:
-    return Rational(1, x, 0, 1)
+def addconst(x: int) -> Moïbus:
+    return Moïbus(1, x, 0, 1)
 
-ident = Rational(1, 0, 0, 1)
-recip = Rational(0, 1, 1, 0)
-zero = Rational(0, 0, 0, 1)
-inf = Rational(0, 1, 0, 0)
+ident = Moïbus(1, 0, 0, 1)
+recip = Moïbus(0, 1, 1, 0)
+zero = Moïbus(0, 0, 0, 1)
+inf = Moïbus(0, 1, 0, 0)
 
-def chain(l: list[Rational]) -> Rational:
+def chain(l: list[Moïbus]) -> Moïbus:
     r = ident
     for x in l:
         r = r * x
@@ -112,7 +115,7 @@ def chain(l: list[Rational]) -> Rational:
 def approx(x: float, tolerance: float = 1e-7) -> Quadratic:
     f = ident
     coeffs: list[int] = []
-    items: list[Rational] = []
+    items: list[Moïbus] = []
     residues: list[float] = []
     r = x
     while True:
@@ -126,7 +129,6 @@ def approx(x: float, tolerance: float = 1e-7) -> Quadratic:
         for i in range(len(items)):
             res = chain(items[:i]).applyq(chain(items[i:]).fixed_point())
             if abs(float(res) - x) <= tolerance:
-                print('Quadratic', i, coeffs, res)
                 return res.reduce()
         r = 1 / frac
         coeffs.append(n)
