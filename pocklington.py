@@ -93,7 +93,7 @@ def pocklington_try_one(N: int, t: int, p: int) -> bool:
     print('Passes fermat...', t & 65535, file=sys.stderr, flush=True)
     # If N is composite, then it has a prime factor q ≤ √N < p.
     #
-    # We have oassed the Fermat test, 2^(q-1) ≡ 1 mod q.
+    # We have passed the Fermat test, 2^(q-1) ≡ 1 mod q.
     #
     # Also, gcd(q-1, p) = 1 as q < p, so that p is invertible mod (q-1), say p.u
     # ≡ 1 mod (q-1).
@@ -105,8 +105,8 @@ def pocklington_try_one(N: int, t: int, p: int) -> bool:
     #
     # Conversely, prime N will pass this test, unless 2^t ≡ 1 mod N.  (The
     # exceptional case should be rare: if N is prime, then there are at most t
-    # solutions of x^t ≡ 1 mod N, so a randomly choosen base has probability at
-    # most 1/p of being an exception).
+    # solutions of x^t ≡ 1 mod N, so a randomly choosen x has probability ≤ 1/p
+    # of being an exception).
     if math.gcd(pow(2, t, N) - 1, N) != 1:
         return False
 
