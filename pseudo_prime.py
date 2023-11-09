@@ -126,7 +126,7 @@ def baillie_psw(n: int) -> bool:
         and miller_rabin1(n, 2) \
         and strong_frobenius_a_star(n)
 
-def test_frob():
+def test_frob() -> None:
     # We need A* not just A for this number...
     assert 5777 == 53 * 109
     assert strong_frobenius(5777, 1, -1, 5)

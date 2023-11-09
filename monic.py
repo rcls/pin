@@ -10,7 +10,7 @@ class Monic:
     degree: int = 0
     small_pow: list[list[int]] = field(default_factory=list)
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         assert self.c
         assert self.c[-1] == 1
         self.degree = len(self.c) - 1
@@ -30,7 +30,7 @@ class Monic:
             r[i] = (r[i] - h * self.c[i]) % self.p
         return r
 
-    def multx_in_place(self, ll: list[int]):
+    def multx_in_place(self, ll: list[int]) -> None:
         assert len(ll) == self.degree
         h = ll[-1]
         for i in reversed(range(1, self.degree)):
@@ -53,7 +53,7 @@ class Monic:
             r[i] = (r[i] - y) % self.p
         return r
 
-    def mac_in_place(self, xx: list[int], v: int, yy: list[int]):
+    def mac_in_place(self, xx: list[int], v: int, yy: list[int]) -> None:
         assert len(yy) <= len(xx)
         for i, y in enumerate(yy):
             xx[i] = (xx[i] + v * y) % self.p
@@ -175,7 +175,7 @@ def poly_mult(xx: list[int], yy: list[int], p: int) -> list[int]:
             r[k] = (r[k] + x * y) % p
     return r
 
-def poly_mult_scalar_in_place(xx: list[int], v: int, p: int):
+def poly_mult_scalar_in_place(xx: list[int], v: int, p: int) -> None:
     for i, x in enumerate(xx):
         xx[i] = x * v % p
 
@@ -201,7 +201,7 @@ def poly_div_mod(rr: list[int], yy: list[int], p: int) -> list[int]:
     #del rr[degree:]
     return result
 
-def trim(xx: list[int]):
+def trim(xx: list[int]) -> None:
     if xx == []:
         return
 

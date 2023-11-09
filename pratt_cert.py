@@ -12,13 +12,9 @@ class PrattCert:
     generator: int
     cofactors: list['PrattCert']
 
-    def verify_no_rec(self):
+    def verify_no_rec(self) -> None:
         assert self.is_prime
         assert self.N > 1
-        if False and self.N in small_primes:
-            assert len(cofactors) == 0
-            return
-
         assert 0 < self.generator < self.N
         order = self.N - 1
         remain = order
@@ -36,13 +32,13 @@ class PrattCert:
         assert twos != 0
         assert pow(self.generator, (self.N - 1) // 2, self.N) == self.N - 1
 
-    def verify(self):
+    def verify(self) -> None:
         for c in self.cofactors:
             c.verify()
         self.verify_no_rec()
 
 # Assumes that the iterator covers the sub-certs!
-def verify_certs(d: dict[int, PrattCert]):
+def verify_certs(d: dict[int, PrattCert]) -> None:
     for k, v in d.items():
         for c in v.cofactors:
             assert c.N in d

@@ -1,7 +1,7 @@
 
 from math import gcd, sqrt
 import itertools
-from typing import Iterator, Tuple
+from typing import Any, Iterator, Tuple
 
 def sieve_primes_to(n: int) -> Iterator[int]:
     yield 2
@@ -137,14 +137,14 @@ def euclid(a: int, b: int) -> Tuple[int, int, int]:
         assert y == y_a * a + y_b * b
     return y_a, y_b, y
 
-def test_tiny_primes():
+def test_tiny_primes() -> None:
     assert list(tiny_primes) == sorted(tiny_primes)
     assert not 0 in tiny_primes
     assert not 1 in tiny_primes
     for i in range(2, tiny_prime_limit):
         assert (i in tiny_primes) == all(i % f != 0 for f in range(2, i))
 
-def test_small_primes():
+def test_small_primes() -> None:
     assert list(small_primes) == sorted(small_primes)
 
     assert not 0 in small_primes
@@ -154,14 +154,14 @@ def test_small_primes():
     for i in range(2, small_prime_limit):
         assert (i in small_primes) == all(i % f != 0 for f in range(2, i))
 
-def test_modest_primes():
+def test_modest_primes() -> None:
     for i in range(small_prime_limit):
         assert (i in modest_primes) == (i in small_primes)
 
     for i in range(small_prime_limit, min(small_prime_limit * small_prime_limit, modest_prime_limit)):
         assert (i in modest_primes) == all(i % p != 0 for p in small_primes)
 
-def test_jacobi():
+def test_jacobi() -> None:
     import random
     for p in modest_primes:
         if p == 2:
@@ -172,23 +172,23 @@ def test_jacobi():
             pp = -1
         assert jacobi(n, p) == pp
 
-def test_is_square():
+def test_is_square() -> None:
     for i in range(1000):
         assert is_square(i*i)
         for j in range(i*i + 1, (i+1)*(i+1)):
             assert not is_square(j)
 
-def test_floor_sqrt():
+def test_floor_sqrt() -> None:
     for i in range(1000):
         for j in range(i*i, i*i + 2*i + 1):
             assert floor_sqrt(j) == (i, i*i)
 
-def test_floor_cbrt():
+def test_floor_cbrt() -> None:
     for i in range(100):
         for j in range(i*i*i, i*i*i + 3*i*i + 3*i + 1):
             assert floor_cbrt(j) == (i, i*i*i)
 
-def test_euclid():
+def test_euclid() -> None:
     for i in range(1, 500):
         for j in range(1, 500):
             x, y, g = euclid(i, j)
@@ -202,7 +202,7 @@ def test_euclid():
         assert g == i
         assert y == 1
 
-def timecall(f, *args, **kwargs):
+def timecall(f: Any, *args: Any, **kwargs: Any) -> Tuple[float, Any]:
     import time
     start = time.time()
     r = f(*args, **kwargs)
@@ -222,7 +222,7 @@ if __name__ == '__main__':
     print(time.time() - st)
 
     import cmath
-    def rc(c):
+    def rc(c: complex) -> complex:
         s = 1048576
         return round(c.real*s)/s + round(c.imag*s)/s*1j
     for p in range(3,500,2):

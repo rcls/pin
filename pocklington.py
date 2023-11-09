@@ -95,7 +95,7 @@ def pocklington_generate(p: int, n: int) -> Iterator[Tuple[int, int]]:
         #if all(N % q != 0 for q in plist):
         #    yield N, t
 
-def pocklington_raise_one(N: int, t: int, p: int):
+def pocklington_raise_one(N: int, t: int, p: int) -> None:
     print(t & 65535, file=sys.stderr, flush=True)
     if pocklington_try_one(N, t, p):
         raise FoundPrime(N)
@@ -115,8 +115,8 @@ def pocklington_try_one(N: int, t: int, p: int) -> bool:
     #
     # As we pass the Fermat test 2^(N-1) ≡ 1 mod N, then 2^(N-1) ≡ 1 mod q.
     #
-    # Also, gcd(q-1, p) = 1 as q < p, so that p is invertible mod (q-1), say p·u
-    # ≡ 1 mod (q-1).
+    # As q < p we have gcd(q-1, p) = 1, so that p is invertible mod (q-1), say
+    # p·u ≡ 1 mod (q-1).
     #
     # Therefore (mod q), 2^t = 2^{(N-1)/p} ≡ 2^{(N-1)u} ≡ 1^u = 1.
     #
@@ -139,14 +139,16 @@ if __name__ == '__main__':
             print(pocklington_parallel(int(s)))
             print('  took', time.time() - start)
     else:
-        def test_iterator(I):
-            for i in I:
-                print(i)
-                N = pocklington_parallel(i)
-                print(N)
-                assert pseudo_prime.baillie_psw(N)
-        test_iterator(range(2, 400))
-        test_iterator((1000, 1001, 1002, 1500, 2000, 2500, 3000, 4000))
+        from typing import Iterable
+        def test_one(i: int) -> None:
+            print(i)
+            N = pocklington_parallel(i)
+            print(N)
+            assert pseudo_prime.baillie_psw(N)
+        for i in range(2, 400):
+            test_one(i)
+        for i in 1000, 1001, 1002, 1500, 2000, 2500, 3000, 4000:
+            test_one(i)
 
 # Search 65536 bits started at t ≡ 31184 mod 65536.
 # Search 65537 bits started at t ≡ 44934 mod 65536.

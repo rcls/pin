@@ -192,7 +192,7 @@ if __name__ == '__main__':
         print(f'{q137=!s}')
         assert q137.is_qr(1)
         assert q137.maybe_sqrt(1) == 1
-        def square_sqrt(q, x):
+        def square_sqrt(q: QuadRing, x: int) -> None:
             s = q.maybe_sqrt(x)
             assert s is not None
             assert jacobi(x, q.p) >= 0
@@ -201,11 +201,13 @@ if __name__ == '__main__':
             assert ss == x % q.p
             if s * 2 > q.p:
                 s -= q.p
-            return s
+            #return s
 
-        square_sqrt(q137, q137.maybe_sqrt(-1))
+        sqrtm1 = q137.maybe_sqrt(-1)
+        assert sqrtm1 is not None
+        square_sqrt(q137, sqrtm1)
         assert q137.is_qr(2)
-        assert square_sqrt(q137, 2)
+        square_sqrt(q137, 2)
         assert jacobi(3, 137) == -1
         assert not q137.is_qr(3)
         assert q137.maybe_sqrt(3) == None
@@ -227,7 +229,7 @@ if __name__ == '__main__':
         square_sqrt(q3s64m1, 2)
         print(f'{q3s64m1.qsqrt(2)=!s}')
         print(f'{q3s64m1.maybe_sqrt(3)=}')
-        def square(x): return x*x
+        def square(x: QuadInt) -> QuadInt: return x*x
         print(f'{q3s64m1.qsqrt(-3)=!s}')
         print(f'{-square(q3s64m1.qsqrt(-3))=!s}')
         print(q3s64m1)
