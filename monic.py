@@ -74,7 +74,7 @@ class Monic:
 
         result = rr[:self.degree]
         for i in range(self.degree, len(rr)):
-            self.mac_in_place(result, rr[i], self.small_pow[i]);
+            self.mac_in_place(result, rr[i], self.small_pow[i])
 
         return result
 
@@ -124,7 +124,7 @@ class Monic:
             return gcd
 
         # Try for gcd with X^{p^i} - X for 1 ≤ 2i ≤ degree.
-        X = self.small_pow[1];
+        X = self.small_pow[1]
         power = X                       # X¹ = X^p⁰
         # For even degree we need to try degree/2, for odd degree we need to
         # try (degree-1)/2.

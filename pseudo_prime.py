@@ -48,31 +48,36 @@ def strong_frobenius(n: int, P: int, Q: int, D: int) -> bool:
         halfP = (P + n) >> 1
     else:
         halfP = P >> 1
+
+    # ½P + ½√D
     base = quad.QuadInt(halfP, (1 + n) >> 1, quad.QuadRing(n, D))
-    #print('Lets check order', base, 'gets', base.pow(n+1))
-    #print('Mod sq', base * base.conjagate())
+    # Start from base^d, and follow through the chain of squares to base^(n+1).
+    # Check that the square root of a rational is either rational or pure
+    # quadratic.
+    #
+    # Then check that we get base^d = Q
     power = base.pow(d)
 
     if power.q == 0:
-        #print(f'Straight to rational {power}')
+        # base^d is already a pure rational.  Only thing left to check is
+        # base^(n+1).
         return pow(power.r, 1 << s, n) == Q
 
     # We don't have a pure rational.  Squaring enough times should get us there,
     # the step before should give a pure quadratic.
     twos = 0
     while power.r != 0:
-        #print(base, power, d, s, twos)
         twos += 1
         if twos >= s:
-            #print('Failed to find pure quad')
-            return False
+            return False                # Went off into ga-ga land.
         power = power.square()
         if power.q == 0:
-            # Whoops, we went straight to a rational!
-            #print('Found unexpected rational')
+            # We found a rational square of a number that is neither pure
+            # rational nor pure quadratic.
             return False
 
-    # Now square to get a pure rational.
+    # We got a pure quadratic.  Now finish the chain of squaring and check that
+    # we end with Q.
     rational = power.q * power.q % n * D % n
     twos += 1
 
@@ -92,7 +97,7 @@ def strong_frobenius_a_star(n: int) -> bool:
     i = 5
     while True:
         if n == i:
-            return True
+            return True                 # We hit this for 5 and 11.
         if i & 3 == 3:
             D = -i
         else:
@@ -107,40 +112,65 @@ def strong_frobenius_a_star(n: int) -> bool:
         if j == -1:
             break
         i += 2
-    #print(f'Jacobi {D} {n} = {j}.  Power = {pow(D,(n-1)//2,n)}')
 
-    if D == 5:
+    if D == 5:                          # Special case to avoid Q = ±1.
         P = 5
         Q = 5
     else:
         P = 1
         Q = (1 - D) // 4
-    #print(f'{P=} {Q=} {D=}')
+
     return strong_frobenius(n, P, Q, D)
 
 def baillie_psw(n: int) -> bool:
-    if n in misc.modest_primes:
-        return True
-    return n > 250000 \
-        and all(n % p != 0 for p in misc.small_primes) \
-        and miller_rabin1(n, 2) \
-        and strong_frobenius_a_star(n)
+    if n < misc.modest_prime_limit:
+        return n in misc.modest_primes
+    if n.bit_length() < 1024:
+        if any(n % p == 0 for p in misc.small_primes):
+            return False
+    else:
+        if any(n % p == 0 for p in misc.modest_primes_list):
+            return False
+    return miller_rabin1(n, 2) and strong_frobenius_a_star(n)
 
 def test_frob() -> None:
-    # We need A* not just A for this number...
+    # We need A* not just A for 5777...
     assert 5777 == 53 * 109
     assert strong_frobenius(5777, 1, -1, 5)
     assert not strong_frobenius_a_star(5777)
-    assert 100981997 == 677 * 149161
+
+    assert 100981997 == 677 * 149161    # Ditto needs A*.
+    assert strong_frobenius(100981997, 1, -1, 5)
     assert not strong_frobenius_a_star(100981997)
+
     assert strong_frobenius_a_star(1000981)
     assert strong_frobenius_a_star(65537)
     assert not strong_frobenius_a_star(5273095699)
 
+def test_small() -> None:
+    for n in range(misc.modest_prime_limit):
+        assert strong_frobenius_a_star(n) == (n in misc.modest_primes)
+
+def test_big():
+    import constants
+    assert baillie_psw(constants.prime_by_bits[512])
+    assert baillie_psw(constants.prime_by_bits[2048])
+
+def test_vpsp() -> None:
     # Pseudos (vpsp)!
     for n in 913, 150267335403, 430558874533, 14760229232131, 936916995253453:
-        #print(f'{strong_frobenius_a_star(n)=} ({n=})')
         assert not strong_frobenius_a_star(n)
+        if n == 14760229232131:
+            P, Q, D = 1, 2, -7
+        else:
+            P, Q, D = 5, 5, 5
+        assert misc.jacobi(D, n) == -1
+        assert D == P*P - 4*Q
+        ring = quad.QuadRing(n, D)
+        base = quad.QuadInt(P, 1, ring) / quad.QuadInt(2, 0, ring)
+        power = base.pow(n + 1)
+        assert power.r == Q % n
+        assert power.q != 0
 
 if __name__ == '__main__':
     import sys, time
@@ -149,18 +179,3 @@ if __name__ == '__main__':
     for n in sys.argv[1:]:
         print(strong_frobenius_a_star(int(n)))
     print(time.time() - st)
-
-    #import pratt_cert
-    #from joblib import Parallel, delayed
-
-    #def check_block(i):
-    #    for n in range(i*1000000+1, i*1000000+1000001, 2):
-    #        assert strong_frobenius_a_star(n) == (not not pratt_cert.pratt_cert(n, {})), \
-    #            f'{n=} {strong_frobenius_a_star(n)=} is wrong'
-    #    print(i)
-    #Parallel(n_jobs=8)(delayed(check_block)(i) for i in range(0, 7000))
-
-    #for n in range(1000001, 2000001, 2):
-    #    assert strong_frobenius_a_star(n) == pollard_rho.is_prime(n), \
-    #        f'{n=} {strong_frobenius_a_star(n)=} Factors {list(pollard_rho.unique_prime_factors(n))}'
-

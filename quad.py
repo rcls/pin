@@ -147,6 +147,8 @@ class QuadInt:
         assert k == y.k
         return QuadInt(r * y.r + q * y.q % k.p * k.non_residue(),
                        r * y.q + q * y.r, k)
+    def __truediv__(self, y: 'QuadInt') -> 'QuadInt':
+        return self.__mul__(y.invert())
     def square(self) -> 'QuadInt':
         r, q, k = self.r, self.q, self.k
         D = k.non_residue()

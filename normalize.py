@@ -132,7 +132,7 @@ def approx(x: float, tolerance: float = 1e-7) -> Quadratic:
                 return res.reduce()
         r = 1 / frac
         coeffs.append(n)
-        item = addconst(n) * recip;
+        item = addconst(n) * recip
         items.append(item)
         f = f * item
         #print(f, x - f.apply(1), x - (f * inf).apply(0), r, coeffs)

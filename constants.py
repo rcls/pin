@@ -2,7 +2,8 @@ import math, time
 
 delta_by_bits = {
     32: 19, 33: 40, 34: 11, 35: 15, 36: 16, 37: 108, 38: 45, 39: 24,
-    40: 16, 41: 7, 42: 15, 43: 12, 44: 18, 45: 9, 46: 9, 47: 7, 48: 2, 49: 59,
+    40: 16, 41: 7, 42: 15, 43: 12, 44: 18,
+    45: 9, 46: 9, 47: 7, 48: 2, 49: 59,
     50: 60, 51: 76, 52: 4, 53: 10, 54: 17,
     55: 19, 56: 24, 57: 67, 58: 20, 59: 9,
     60: 34, 61: 16, 62: 12, 63: 43, 64: 12,
@@ -20,7 +21,7 @@ delta_by_bits = {
     2048: 1280, 2049: 547, 2050: 3845, 4096: 1915, 4097: 977, 4098: 8563,
     8192: 1625, 8193: 14319, 8194: 52, 16384: 25567, 16385: 1086, 16386: 17472,
     32768: 9274, 32769: 9033, 32770: 14620,
-    65536: 59525}
+    65536: 59525, 65537: 108747}
 
 prime_by_bits = {
     2: 3, 3: 5, 4: 11, 5: 17, 6: 37, 7: 67, 8: 131, 9: 257, 10: 521,
@@ -61,21 +62,17 @@ def test_len() -> None:
 def verify_one_fermat(bits: int, base: int, verbose:bool = False) -> None:
     start = time.time()
     prime = prime_by_bits[bits]
+    if verbose:
+        print(f'Test Fermat {bits}')
     if bits in delta_by_bits:
-        if verbose:
-            print(f'Test fermat {bits}')
         assert pow(base, prime-1, prime) == 1
-        if verbose:
-            print(f'Passed Fermat {bits} in', time.time() - start, 'seconds')
-        return
-    # Use a Pratt cert instead.
-    import pratt_cert
-    assert bits < 100
+    else:
+        # Use a Pratt cert instead.
+        import pratt_cert
+        assert bits < 100
+        assert pratt_cert.pratt_cert(prime, {})
     if verbose:
-        print(f'Test pratt {bits}')
-    assert pratt_cert.pratt_cert(prime, {})
-    if verbose:
-        print(f'Passed Pratt {bits} in', time.time() - start, 'seconds')
+        print(f'Passed Fermat {bits} in', time.time() - start, 'seconds')
 
 def verify_one_sub(bits: int, base: int, verbose:bool = False) -> None:
     if not bits in delta_by_bits:
@@ -94,24 +91,25 @@ def verify_one_sub(bits: int, base: int, verbose:bool = False) -> None:
     if verbose:
         print(f'Passed sub {bits} in', time.time() - start, 'seconds')
 
-def test_verify_small() -> None:
-    import joblib, pseudo_prime
-    print('Serial tests')
+def test_verify_serial() -> None:
+    import pseudo_prime
     for bits in prime_by_bits:
         if bits < 8000:
             verify_one_fermat(bits, 3)
             verify_one_sub(bits, 3)
             assert pseudo_prime.baillie_psw(prime_by_bits[bits])
-    print('Parallel tests')
+
+def test_verify_parallel(limit: int = 30000) -> None:
+    import joblib
     joblib.Parallel(n_jobs=-1, batch_size=1)(
         joblib.delayed(func)(bits, 3, True)
-        for bits in reversed(prime_by_bits) if 8000 <= bits < 30000
+        for bits in reversed(prime_by_bits) if 8000 <= bits < limit
         for func in (verify_one_fermat, verify_one_sub))
 
 def regenerate(bits: int, low16: int, wraps: int = 0) -> None:
     subbits = (bits + 3) // 2
     p = prime_by_bits[subbits]
-    start_t = ((1 << bits-1) // p) & -2
+    start_t = (1 << bits-1) // p
     t = (start_t & -65536) + low16
     if t < start_t:
         t += 65536

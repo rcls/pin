@@ -1,5 +1,5 @@
 
-from math import gcd
+from math import gcd, lcm
 from typing import Tuple
 from numbers import Rational
 from fractions import Fraction
@@ -10,7 +10,7 @@ def rational(f: Rational) -> str:
     if d == 1:
         return str(n)
 
-    s = '-' if n < 0 else '';
+    s = '-' if n < 0 else ''
     an = abs(n)
     if an == 1 and d <= 10:
         return s + '01½⅓¼⅕⅙⅐⅛⅑⅒'[d]
@@ -60,15 +60,13 @@ def factorout(o: Rational, a: Rational, b: Rational, k: str) -> str:
 def ratlinstring(a: Rational, b: Rational, k: str) -> str:
     # Format a + b × k in the most economical way.
     # Try taking out various factors:
-    if a == 0 and b == 0:
-        return '0'                      # Avoids divide by zero.
-    an, ad = a.numerator, a.denominator
-    bn, bd = b.numerator, b.denominator
+    an, ad = abs(a.numerator), a.denominator
+    bn, bd = abs(b.numerator), b.denominator
     result = ratlin_basic(a, b, k)
-    for on in 1, an, bn, an * bn, gcd(an, bn), an * bn // gcd(an, bn):
-        for od in 1, ad, bd, ad * bd, gcd(ad, bd), ad * bd // gcd(ad, bd):
-            for son in on, -on:
-                if on != 0 and od != 0:
+    for on in lcm(an, bn), max(an, bn), min(an, bn), gcd(an, bn), 1:
+        for od in lcm(ad, bd), max(ad, bd), min(ad, bd), gcd(ad, bd), 1:
+            if on != 0 and od != 0:
+                for son in on, -on:
                     attempt = factorout(Fraction(son, od), a, b, k)
                     if len(attempt) < len(result):
                         result = attempt
@@ -77,7 +75,7 @@ def ratlinstring(a: Rational, b: Rational, k: str) -> str:
 if __name__ == '__main__':
     from sys import argv
     if len(argv) == 2:
-        print(ratlinstring(Fraction(1), Fraction(1), 'φ'))
+        print(ratlinstring(Fraction(argv[1]), Fraction(argv[1]), 'φ'))
     elif len(argv) == 3:
         print(ratlinstring(Fraction(argv[1]), Fraction(argv[2]), 'φ'))
     elif len(argv) == 3:
