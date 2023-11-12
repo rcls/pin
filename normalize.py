@@ -50,7 +50,7 @@ class Quadratic:
     def multi(self, n: int) -> 'Quadratic':
         return Quadratic(self.r * n, self.q * n, self.b)
     def __repr__(self) -> str:
-        return ratlinstring(self.r, self.q, f'√{self.b}')
+        return ratlinstring(self.r, self.q, f'√{self.b} ')
 
 # ax+b / cx+d
 @dataclass(frozen=True)

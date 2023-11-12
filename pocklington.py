@@ -19,13 +19,12 @@ def pocklington_serial(n: int) -> int:
 
     # Start with the lowest possible value of t.  We want t even, so ensure
     # that.  The value here is too small, the t+=2 below gets us in range.
-    t = ((1 << n-1) // p) & -2
+    t = (1 << n-1) // p & -2
 
     while True:
         t += 2
         N = t * p + 1
         assert N.bit_length() == n, f'{n} {p} {t} {1<<n-1} {N} {1<<n}'
-        assert p * p > N
         if any(N != q and N % q == 0 for q in misc.small_primes):
             continue
         if pocklington_try_one(N, t, p):
@@ -76,7 +75,6 @@ def pocklington_generate(p: int, n: int) -> Iterator[Tuple[int, int]]:
         t = start_t + i
         N = t * p + 1
         assert N.bit_length() == n, f'{n} {p} {t} {1<<n-1} {N} {1<<n}'
-        assert p * p > N
 
         # The condition is equivalent to `all(N % q != 0 for q in plist)` but
         # faster to compute.  Note that we never get N = q, as we only get
@@ -93,8 +91,9 @@ def pocklington_raise_one(N: int, t: int, p: int) -> None:
         raise FoundPrime(N)
 
 def pocklington_try_one(N: int, t: int, p: int) -> bool:
-    # Pocklington test for N = p·t + 1 with N < p², p prime.  Check t.  We
-    # believe the caller on the primeness of p.
+    # Pocklington test for N = p·t + 1 with N < p², p prime.  We believe the
+    # caller on the primeness of p and computing N.
+    assert p * p > N
     assert 1 <= t < p
 
     # Do a Fermat test for N.  It doesn't really matter what the base is, so
@@ -115,9 +114,9 @@ def pocklington_try_one(N: int, t: int, p: int) -> bool:
     # Now q divides both N and 2^t - 1, and so also the gcd below.
     #
     # Conversely, prime N will pass this test, unless 2^t ≡ 1 mod N.  (The
-    # exceptional case should be rare: if N is prime, then there are at most t
-    # solutions of x^t ≡ 1 mod N, so a randomly choosen x has probability ≤ 1/p
-    # of being an exception).
+    # exceptional case should be rare: if N is prime, then there are t solutions
+    # of x^t ≡ 1 mod N, and a randomly choosen x has probability 1/p of being an
+    # exception).
     if math.gcd(pow(2, t, N) - 1, N) != 1:
         return False
 

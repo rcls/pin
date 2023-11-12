@@ -121,7 +121,7 @@ if __name__ == '__main__':
     certs: dict[int, PrattCert] = {}
     for s in sys.argv[1:]:
         print(f'{s}:', ' '.join(
-            str(c.N) for c in unique_prime_factor_certs(int(s, 0), certs)))
+            str(c.N) for c in unique_prime_factor_certs(eval(s), certs)))
     for prime in sorted(certs.keys()):
         cert = certs[prime]
         print(prime, 'gen', cert.generator, 'co', ' '.join(str(c.N) for c in cert.cofactors))
