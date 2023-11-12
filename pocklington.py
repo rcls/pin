@@ -31,24 +31,22 @@ def pocklington_serial(n: int) -> int:
         if pocklington_try_one(N, t, p):
             return N
 
-def pocklington_parallel(n: int, runner: joblib.Parallel = None) -> int:
+def pocklington_parallel(n: int) -> int:
     if n in constants.prime_by_bits:
         return constants.prime_by_bits[n]
     if n < 1000:
         return pocklington_serial(n)
 
-    if runner is None:
-        runner = joblib.Parallel(n_jobs=-1, batch_size=1, timeout=86400)
-
     # Generate an n bit prime (between 2^(n-1) and 2^n.  It will be in the form
     # p·t + 1 where t < p.  So generate a prime enough bigger than 2^(½n-½)
     # to give us some leeway.
-    p = pocklington_parallel((n + 3) // 2, runner)
+    p = pocklington_parallel((n + 3) // 2)
     assert p*p >= 1 << n
     print(f'Search {n} bits', file=sys.stderr, flush=True)
     try:
-        runner(joblib.delayed(pocklington_raise_one)(N, t, p)
-               for N, t in pocklington_generate(p, n))
+        joblib.Parallel(n_jobs=-1, batch_size=1, timeout=86400)(
+            joblib.delayed(pocklington_raise_one)(N, t, p)
+            for N, t in pocklington_generate(p, n))
     except FoundPrime as e:
         return e.args[0]
     assert False                        # Hopefully we never get here!
