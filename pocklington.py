@@ -131,9 +131,9 @@ def get_bertha() -> Sequence[int]:
     with open('primes.bin') as f:
         m = mmap.mmap(f.fileno(), 0, mmap.MAP_PRIVATE, mmap.ACCESS_READ)
         bertha = memoryview(m).cast('I')
-        assert bertha[0] == 2
-        assert bertha[-1] == 4294967291
-        return bertha
+    assert bertha[0] == 2
+    assert bertha[-1] == 4294967291
+    return bertha
 
 # Assumes that the file exists.
 def test_bertha() -> None:

@@ -1,4 +1,4 @@
-from misc import tiny_primes, small_primes
+from misc import small_primes
 import pseudo_prime
 
 from math import gcd
@@ -52,3 +52,17 @@ def unique_prime_factors(N: int) -> Iterator[int]:
             yield p
             while remain % p == 0:
                 remain //= p
+
+if __name__ == '__main__':
+    import misc, sys
+    for s in sys.argv[1:]:
+        n = eval(s)
+        if pseudo_prime.baillie_psw(n):
+            print(f'{s}: probably prime')
+            continue
+
+        f = pollard_rho(n)
+        cof = n // f
+        pf = 'probable prime' if pseudo_prime.baillie_psw(f) else 'composite'
+        pcof = 'probable prime' if pseudo_prime.baillie_psw(cof) else 'composite'
+        print(f'{s}: {pf} factor {f} with {pcof} quotient')

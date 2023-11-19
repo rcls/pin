@@ -25,6 +25,17 @@ modest_prime_limit = 250000
 modest_primes_list = tuple(sieve_primes_to(modest_prime_limit))
 modest_primes = set(modest_primes_list)
 
+def split_twos(n: int) -> Tuple[int, int]:
+    d = n
+    s = 0
+    while d & 3 == 0:
+        d >>= 2
+        s += 2
+    if d & 1 == 0:
+        d >>= 1
+        s += 1
+    return d, s
+
 def jacobi(a: int, n: int) -> int:
     assert n > 0 and n & 1 == 1         # Must be positive, odd.
     sign = 1

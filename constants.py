@@ -135,3 +135,7 @@ def generate(bits: int) -> None:
     print(f'Delta for {bits} is {t - start_t}')
     delta_by_bits[bits] = t - start_t
     prime_by_bits[bits] = prime
+
+if __name__ == '__main__':
+    import sys
+    regenerate(int(sys.argv[1]), int(sys.argv[2]))

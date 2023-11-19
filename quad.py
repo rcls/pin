@@ -1,56 +1,48 @@
-from misc import small_primes, jacobi
+import misc, ratlinstring
 
 from dataclasses import dataclass
-from typing import Optional
 
 class QuadRing:
     p: int                              # Should be odd prime
     S: int
     Q: int
-    _non_residue: Optional[int]
-    _square_chain: Optional[list[int]] = []
+    non_residue: int
+    _square_chain: list[int] = []
 
-    def __init__(self, p: int, non_residue: Optional[int] = None):
+    def __init__(self, p: int, non_residue: int|None = None):
         # TODO - how to fail if p<2.
         self.p = p
-        self._non_residue = non_residue
-        Q = p - 1
-        S = 0
-        while Q & 1 == 0:
-            Q >>= 1
-            S += 1
-        self.S = S
-        self.Q = Q
+        self.Q, self.S = misc.split_twos(p - 1)
+        if non_residue is not None:
+            self.non_residue = non_residue
+            return
+
+        assert p & 1 == 1
+        assert not misc.is_square(p)
+        for nr in misc.modest_primes_list:
+            if nr == p:
+                continue
+            j = misc.jacobi(nr, p)
+            assert j != 0, f'{p} is not prime, factor {j}'
+            if j == -1:
+                self.non_residue = nr
+                break
+        else:
+            assert False
 
     def is_qr(self, n: int) -> bool:
         # Only valid if p really is prime!
-        return self.p == 2 or jacobi(n, self.p) >= 0
-
-    def non_residue(self) -> int:
-        p = self.p
-        assert p & 1 == 1
-        if self._non_residue:
-            return self._non_residue
-        for nr in small_primes:
-            if nr == p:
-                continue                # Useless.
-            j = jacobi(nr, p)
-            assert j != 0, f'{p} is not prime, factor {j}'
-            if j == -1:
-                self._non_residue = nr
-                return nr
-
-        assert False, f'Failed to find non-residue for {p}'
+        return self.p == 2 or misc.jacobi(n, self.p) >= 0
 
     def square_chain(self, squares: int) -> int:
         if not self._square_chain:
-            self._square_chain = [pow(self.non_residue(), self.Q, self.p)]
+            self._square_chain = [pow(self.non_residue, self.Q, self.p)]
         while len(self._square_chain) <= squares:
             x = self._square_chain[-1]
             self._square_chain.append(x * x % self.p)
         return self._square_chain[squares]
 
-    def maybe_sqrt(self, n: int) -> Optional[int]:
+    def maybe_sqrt(self, n: int) -> int|None:
         p = self.p
         n = n % p
         if n == 0:
@@ -115,14 +107,11 @@ class QuadRing:
         if self.is_qr(n):
             return QuadInt(self.sqrt(n), 0, self)
         else:
-            p, k = self.p, self.non_residue()
+            p, k = self.p, self.non_residue
             return QuadInt(0, self.sqrt(n * k) * pow(k, -1, p) % p, self)
 
     def __str__(self) -> str:
-        if self._non_residue:
-            return f'√{self._non_residue} (mod {self.p})'
-        else:
-            return f'√� (mod {self.p})'
+        return f'√{self.non_residue} (mod {self.p})'
 
 @dataclass(frozen=True)
 class QuadInt:
@@ -145,14 +134,14 @@ class QuadInt:
     def __mul__(self, y: 'QuadInt') -> 'QuadInt':
         r, q, k = self.r, self.q, self.k
         assert k == y.k
-        return QuadInt(r * y.r + q * y.q % k.p * k.non_residue(),
+        return QuadInt(r * y.r + q * y.q % k.p * k.non_residue,
                        r * y.q + q * y.r, k)
     def __truediv__(self, y: 'QuadInt') -> 'QuadInt':
         return self.__mul__(y.invert())
     def square(self) -> 'QuadInt':
         r, q, k = self.r, self.q, self.k
-        D = k.non_residue()
-        if D < 32:
+        D = k.non_residue
+        if D.bit_length() < 32:
             return QuadInt(r * r + q * q * D, 2 * r * q, k)
         else:
             return QuadInt(r * r + q * q % k.p * D, 2 * r * q, k)
@@ -160,15 +149,21 @@ class QuadInt:
     def invert(self) -> 'QuadInt':
         # (r - q√k)(r² - q²k)⁻¹
         r, q, p = self.r, self.q, self.k.p
-        modsq = r * r - q * q % p * self.k.non_residue()
+        modsq = r * r - q * q % p * self.k.non_residue
         invmodsq = pow(modsq, -1, p)
         return QuadInt(r * invmodsq, -q * invmodsq, self.k)
 
+    def halve(self) -> 'QuadInt':
+        r, q, p = self.r, self.q, self.k.p
+        r = r // 2 if r & 1 == 0 else (r + p) // 2
+        q = q // 2 if q & 1 == 0 else (q + p) // 2
+        return QuadInt(r, q, self.k)
+
     def pow(self, n: int) -> 'QuadInt':
         #print(f'Pow {self} {n}')
-        b = self
         if n == 0:
             return QuadInt(1, 0, self.k)
+        b = self
         if n < 0:
             b = b.invert()
             n = -n
@@ -178,8 +173,22 @@ class QuadInt:
             if n & (1 << i):
                 result *= b
         return result
+
+    def halve_pow(self, n: int) -> 'QuadInt':
+        #print(f'Pow {self} {n}')
+        assert n > 0
+        result = self.halve()
+        for i in reversed(range(n.bit_length() - 1)):
+            result = result.square()
+            if n & (1 << i):
+                result = (result * self).halve()
+        return result
+
     def __str__(self) -> str:
-        return f'{self.r} + {self.q} {self.k}'
+        from fractions import Fraction
+        return ratlinstring.ratlinstring(
+            Fraction(self.r, 1), Fraction(self.q, 1),
+            f' √{self.k.non_residue} ') + f' (mod {self.k.p})'
 
 if __name__ == '__main__':
     import sys
@@ -197,7 +206,7 @@ if __name__ == '__main__':
         def square_sqrt(q: QuadRing, x: int) -> None:
             s = q.maybe_sqrt(x)
             assert s is not None
-            assert jacobi(x, q.p) >= 0
+            assert misc.jacobi(x, q.p) >= 0
             assert s == q.sqrt(x)
             ss = s * s % q.p
             assert ss == x % q.p
@@ -210,7 +219,7 @@ if __name__ == '__main__':
         square_sqrt(q137, sqrtm1)
         assert q137.is_qr(2)
         square_sqrt(q137, 2)
-        assert jacobi(3, 137) == -1
+        assert misc.jacobi(3, 137) == -1
         assert not q137.is_qr(3)
         assert q137.maybe_sqrt(3) == None
         print(f'{q137=!s}')
@@ -222,12 +231,12 @@ if __name__ == '__main__':
         square_sqrt(q12s64p1, 3)
         square_sqrt(q12s64p1, -3)
         assert q12s64p1.maybe_sqrt(5) is None
-        assert jacobi(5, q12s64p1.p) == -1
+        assert misc.jacobi(5, q12s64p1.p) == -1
         square_sqrt(q12s64p1, -1)
         print(q12s64p1)
 
         q3s64m1 = QuadRing((3 << 64) - 1)
-        assert jacobi(2, q3s64m1.p)
+        assert misc.jacobi(2, q3s64m1.p)
         square_sqrt(q3s64m1, 2)
         print(f'{q3s64m1.qsqrt(2)=!s}')
         print(f'{q3s64m1.maybe_sqrt(3)=}')

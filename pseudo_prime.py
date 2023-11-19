@@ -2,18 +2,7 @@
 import misc, quad
 
 import math
-from typing import Tuple
-
-def split_twos(n: int) -> Tuple[int, int]:
-    d = n
-    s = 0
-    while d & 3 == 0:
-        d >>= 2
-        s += 2
-    if d & 1 == 0:
-        d >>= 1
-        s += 1
-    return d, s
+from typing import Iterator, Tuple
 
 def miller_rabin1(n: int, base: int) -> bool:
     g = math.gcd(n, base)
@@ -21,7 +10,7 @@ def miller_rabin1(n: int, base: int) -> bool:
         return g == n
     if n & 1 == 0:
         return n == 2
-    Q, S = split_twos(n - 1)
+    Q, S = misc.split_twos(n - 1)
     sq = pow(base, Q, n)
     if sq == 1:
         return True
@@ -42,7 +31,7 @@ def strong_frobenius(n: int, P: int, Q: int, D: int) -> bool:
     assert n > 0 and n & 1 == 1
     assert D % n == (P*P - 4*Q) % n
     assert misc.jacobi(D, n) == -1
-    d, s = split_twos(n + 1)
+    d, s = misc.split_twos(n + 1)
 
     if P & 1:
         halfP = (P + n) >> 1
@@ -105,9 +94,9 @@ def strong_frobenius_a_star(n: int) -> bool:
         assert D % 4 == 1
         j = misc.jacobi(D, n)
         if j == 0:
-            # i (or maybe 3) is a factor.  We never hit this on odd prime n.
-            # Either we hit the n==i check above, or else n==3 and we choose
-            # D=5.
+            # i (or maybe 3) is a factor.  We never hit this on odd prime n.  If
+            # n==3 and we choose D=5, and for other small odd primes we hit
+            # n==i above instead.
             return False
         if j == -1:
             break
@@ -123,14 +112,17 @@ def strong_frobenius_a_star(n: int) -> bool:
     return strong_frobenius(n, P, Q, D)
 
 def baillie_psw(n: int) -> bool:
+    # Ad hoc tests for small numbers.
     if n < misc.modest_prime_limit:
         return n in misc.modest_primes
+    plist: Iterator[int]
     if n.bit_length() < 1024:
-        if any(n % p == 0 for p in misc.small_primes):
-            return False
+        plist = iter(misc.small_primes)
     else:
-        if any(n % p == 0 for p in misc.modest_primes_list):
-            return False
+        plist = iter(misc.modest_primes_list)
+    if any(n % p == 0 for p in plist):
+        return False
+    # The main check.
     return miller_rabin1(n, 2) and strong_frobenius_a_star(n)
 
 def test_frob() -> None:
@@ -151,10 +143,12 @@ def test_small() -> None:
     for n in range(misc.modest_prime_limit):
         assert strong_frobenius_a_star(n) == (n in misc.modest_primes)
 
-def test_big():
+def test_big() -> None:
     import constants
     assert baillie_psw(constants.prime_by_bits[512])
+    assert baillie_psw(constants.prime_by_bits[1024])
     assert baillie_psw(constants.prime_by_bits[2048])
+    assert baillie_psw(constants.prime_by_bits[4096])
 
 def test_vpsp() -> None:
     # Pseudos (vpsp)!
@@ -173,9 +167,31 @@ def test_vpsp() -> None:
         assert power.q != 0
 
 if __name__ == '__main__':
-    import sys, time
+    import constants, sys, time
     sys.set_int_max_str_digits(1000000)
-    st = time.time()
-    for n in sys.argv[1:]:
-        print(strong_frobenius_a_star(int(n)))
-    print(time.time() - st)
+    args = [eval(sys.argv[i]) for i in range(1, len(sys.argv))]
+    if len(args) == 1:
+        st = time.time()
+        if strong_frobenius_a_star(args[0]):
+            print(f'{sys.argv[1]}: Probable prime')
+        else:
+            print(f'{sys.argv[1]}: Composite')
+        print('Took', time.time() - st, 'seconds')
+    elif 2 <= len(args) <= 3:
+        N, D = args[0], args[1]
+        assert misc.jacobi(D, N) == -1
+        if len(args) == 3:
+            P = args[2]
+        elif D % 4 == 0:
+            P = 2
+        elif D == 5:
+            P = 5
+        else:
+            assert D % 4 == 1
+            P = 1
+        Q = (P * P - D) // 4
+        st = time.time()
+        print(strong_frobenius(N, P, Q, D), f'{P=} {Q=} {D=}')
+        print('Took', time.time() - st, 'seconds')
+    else:
+        assert False
