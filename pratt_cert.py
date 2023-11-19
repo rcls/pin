@@ -19,25 +19,57 @@ class PrattCert:
         assert self.N > 1
         assert 0 < self.generator < self.N
         order = self.N - 1
-        remain = order
-        for c in self.cofactors:
-            assert remain % c.N == 0
-            remain //= c.N
-            while remain % c.N == 0:
-                remain //= c.N
-            assert pow(self.generator, order // c.N, self.N) != 1
-        twos = 0
-        while remain % 2 == 0:
-            twos += 1
-            remain //= 2
-        assert remain == 1
-        assert twos != 0
-        assert pow(self.generator, (self.N - 1) // 2, self.N) == self.N - 1
+        assert order & 1 == 0, f'{order} {self.N}'
+        assert pratt_check_gen(self.N, self.cofactors, self.generator)
+        assert pow(self.generator, order // 2, self.N) == self.N - 1
 
     def verify(self) -> None:
         for c in self.cofactors:
             c.verify()
         self.verify_no_rec()
+
+# Use divide-and-conquer for computing the cofactor powers for the generator
+# check.  This is the recursive function.
+def pratt_check_worker(N: int, plist: list[Tuple[int, int]],
+                       others: int, lo: int, hi: int) -> bool:
+    if lo + 1 >= hi:
+        p, e = plist[lo]
+        return e <= 1 or pow(others, pow(p, e-1), N) != 1
+    exp_lo = 1
+    exp_hi = 1
+    mid = (lo + hi) // 2
+    for i in range(lo, mid):
+        exp_lo *= pow(plist[i][0], plist[i][1])
+    for i in range(mid, hi):
+        exp_hi *= pow(plist[i][0], plist[i][1])
+    # Note the swap!
+    others_lo = pow(others, exp_hi, N)
+    others_hi = pow(others, exp_lo, N)
+    if others_lo == 1 or others_hi == 1: # Short circuit.
+        return False
+    return pratt_check_worker(N, plist, others_lo, lo, mid) \
+        and pratt_check_worker(N, plist, others_hi, mid, hi)
+
+# Check the generator for a Pratt cert.  The divide-and-conquer speeds the
+# runtime for large numbers of cofactors.
+def pratt_check_gen(N: int, cofactors: list[PrattCert], g: int) -> bool:
+    if not cofactors:
+        return True                     # Nothing to do.
+    remain = N - 1
+    plist = []
+    for c in cofactors:
+        e = 0
+        while remain % c.N == 0:
+            e += 1
+            remain //= c.N
+        assert e != 0
+        plist.append((c.N, e))
+    assert remain.bit_count() == 1
+    assert remain > 1
+    others = pow(g, remain, N)
+    if others == 1:
+        return False
+    return pratt_check_worker(N, plist, others, 0, len(plist))
 
 # Assumes that the iterator covers the sub-certs!
 def verify_certs(d: dict[int, PrattCert]) -> None:
@@ -85,12 +117,8 @@ def pratt_cert(N: int, cache: dict[int,PrattCert]) -> Optional[PrattCert]:
             return None               # Either an extra sqrt(1) or fails Fermat.
         if cofactors is None:
             cofactors = list(unique_prime_factor_certs(reduced, cache))
-        for f in cofactors:
-            if pow(x, (N - 1) // f.N, N) == 1:
-                break                   #  Not a generator.
-        else:
+        if pratt_check_gen(N, cofactors, x):
             cofactors.sort(key=lambda c: c.N)
-            # print(f'{N} is prime gen {x} N-1 factors', ' '.join(str(f.N) for f in cofactors))
             ret = PrattCert(N, x, cofactors)
             cache[N] = ret
             return ret
