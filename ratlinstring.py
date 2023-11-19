@@ -54,7 +54,7 @@ def ratlin_basic(a: Rational, b: Rational, k: str) -> str:
 
     return rational(a) + (' + ' if b.numerator >= 0 else ' - ') + bk
 
-def factorout(o: Rational, a: Rational, b: Rational, k: str) -> str:
+def factorout(o: Fraction, a: Rational, b: Rational, k: str) -> str:
     inner = ratlin_basic(a / o, b / o, k)
     if '+' in inner or '-' in inner:
         inner = '(' + inner + ') '

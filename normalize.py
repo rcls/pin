@@ -5,14 +5,13 @@ from ratlinstring import ratlinstring
 
 from fractions import Fraction
 from math import sqrt, gcd
-from numbers import Rational
 from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class Quadratic:
     # r + q × √b
-    r: Rational
-    q: Rational = Fraction(0)
+    r: Fraction
+    q: Fraction = Fraction(0)
     b: int = 5
     def reduce(self) -> 'Quadratic':
         b = self.b
@@ -63,7 +62,7 @@ class Moïbus:
         return (self.a * x + self.b) / (self.c * x + self.d)
     def applyi(self, n: int) -> Fraction:
         return Fraction(self.a * n + self.b, self.c * n + self.d)
-    def applyf(self, x: Rational) -> Fraction:
+    def applyf(self, x: Fraction) -> Fraction:
         return Fraction(self.a * x.numerator + self.b * x.denominator,
                         self.c * x.numerator + self.d * x.denominator)
     def applyq(self, x: Quadratic) -> Quadratic:
