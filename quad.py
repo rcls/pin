@@ -174,16 +174,6 @@ class QuadInt:
                 result *= b
         return result
 
-    def halve_pow(self, n: int) -> 'QuadInt':
-        #print(f'Pow {self} {n}')
-        assert n > 0
-        result = self.halve()
-        for i in reversed(range(n.bit_length() - 1)):
-            result = result.square()
-            if n & (1 << i):
-                result = (result * self).halve()
-        return result
-
     def __str__(self) -> str:
         from fractions import Fraction
         return ratlinstring.ratlinstring(

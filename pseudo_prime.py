@@ -23,7 +23,7 @@ def miller_rabin1(n: int, base: int) -> bool:
     return n - sq == 1         # Otherwise either fails Fermat or unexpected √1.
 
 # n must be odd, positive, and D=P²-4Q (mod n) with (D|n) = -1.
-def strong_frobenius(n: int, P: int, Q: int, D: int) -> bool:
+def strong_frobenius(n: int, P: int, Q: int, D: int, double: bool = False) -> bool:
     #print(f'Frobenius {n=} {P=} {Q=} {D=} {n-D=}')
     P = P % n
     Q = Q % n
@@ -33,18 +33,22 @@ def strong_frobenius(n: int, P: int, Q: int, D: int) -> bool:
     assert misc.jacobi(D, n) == -1
     d, s = misc.split_twos(n + 1)
 
-    if P & 1:
-        halfP = (P + n) >> 1
+    if double:
+        # We want powers of ½P + ½√D.  However, we cheat and take powers of
+        # P + √D instead (and so double Q), which is faster.  For Baillie-PWD,
+        # we already did a base 2 Fermat check, so this makes no difference.
+        base = quad.QuadInt(P, 1, quad.QuadRing(n, D))
+        Q = Q * 2 % n
+    elif P & 1 == 0 and D & 3 == 0:
+        # We want powers of ½P + ½√D = ½P + √(¼D).
+        base = quad.QuadInt(P // 2, 1, quad.QuadRing(n, D // 4))
     else:
-        halfP = P >> 1
+        # Take powers of ½P + ½√D.
+        base = quad.QuadInt(P, 1, quad.QuadRing(n, D)).halve()
 
-    # ½P + ½√D
-    base = quad.QuadInt(halfP, (1 + n) >> 1, quad.QuadRing(n, D))
     # Start from base^d, and follow through the chain of squares to base^(n+1).
     # Check that the square root of a rational is either rational or pure
     # quadratic.
-    #
-    # Then check that we get base^d = Q
     power = base.pow(d)
 
     if power.q == 0:
@@ -67,7 +71,7 @@ def strong_frobenius(n: int, P: int, Q: int, D: int) -> bool:
 
     # We got a pure quadratic.  Now finish the chain of squaring and check that
     # we end with Q.
-    rational = power.q * power.q % n * D % n
+    rational = power.q * power.q % n * base.k.non_residue % n
     twos += 1
 
     # Now do the remainder of the squaring.
@@ -109,7 +113,7 @@ def strong_frobenius_a_star(n: int) -> bool:
         P = 1
         Q = (1 - D) // 4
 
-    return strong_frobenius(n, P, Q, D)
+    return strong_frobenius(n, P, Q, D, double = True)
 
 def baillie_psw(n: int) -> bool:
     # Ad hoc tests for small numbers.
