@@ -34,11 +34,11 @@ def strong_frobenius(n: int, P: int, Q: int, D: int, double: bool = False) -> bo
     d, s = misc.split_twos(n + 1)
 
     if double:
-        # We want powers of ½P + ½√D.  However, we cheat and take powers of
-        # P + √D instead (and so double Q), which is faster.  For Baillie-PWD,
-        # we already did a base 2 Fermat check, so this makes no difference.
+        # We want powers of ½P + ½√D.  However, we cheat and take powers of P +
+        # √D instead (and so quadruple Q), which is faster.  For Baillie-PSW, we
+        # already did a base 2 Fermat check, so this makes no difference.
         base = quad.QuadInt(P, 1, quad.QuadRing(n, D))
-        Q = Q * 2 % n
+        Q = Q * 4 % n
     elif P & 1 == 0 and D & 3 == 0:
         # We want powers of ½P + ½√D = ½P + √(¼D).
         base = quad.QuadInt(P // 2, 1, quad.QuadRing(n, D // 4))
