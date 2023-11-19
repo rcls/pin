@@ -1,19 +1,21 @@
 
-from misc import small_primes, tiny_primes
+import misc
 from pollard_rho import pollard_rho, unique_prime_factors
 
 from dataclasses import dataclass
-from typing import Iterator, Optional, NamedTuple
+from typing import Iterator, Optional, Tuple
 
 @dataclass
 class PrattCert:
     N: int
-    is_prime: bool
     generator: int
     cofactors: list['PrattCert']
 
     def verify_no_rec(self) -> None:
-        assert self.is_prime
+        if self.N == 2:
+            assert self.generator == 1
+            assert len(self.cofactors) == 0
+            return
         assert self.N > 1
         assert 0 < self.generator < self.N
         order = self.N - 1
@@ -48,7 +50,7 @@ def pratt_cert(N: int, cache: dict[int,PrattCert]) -> Optional[PrattCert]:
     if N in cache:
         return cache[N]
     if N == 2:
-        ret = PrattCert(N, True, 1, [])
+        ret = PrattCert(N, 1, [])
         cache[N] = ret
         return ret
     if N == 1:
@@ -61,7 +63,7 @@ def pratt_cert(N: int, cache: dict[int,PrattCert]) -> Optional[PrattCert]:
     if twos == 0:
         return None                     # N-1 is odd, N is even.
     cofactors = None
-    for x in small_primes:
+    for x in misc.small_primes:
         x = x % N
         if x == 0:
             continue                    # Prime but we want a cert.
@@ -79,7 +81,7 @@ def pratt_cert(N: int, cache: dict[int,PrattCert]) -> Optional[PrattCert]:
                 return None             # Extra sqrt(1).
         if useless:
             continue
-        if p != N - 1:
+        if N - p != 1:
             return None               # Either an extra sqrt(1) or fails Fermat.
         if cofactors is None:
             cofactors = list(unique_prime_factor_certs(reduced, cache))
@@ -89,7 +91,7 @@ def pratt_cert(N: int, cache: dict[int,PrattCert]) -> Optional[PrattCert]:
         else:
             cofactors.sort(key=lambda c: c.N)
             # print(f'{N} is prime gen {x} N-1 factors', ' '.join(str(f.N) for f in cofactors))
-            ret = PrattCert(N, True, x, cofactors)
+            ret = PrattCert(N, x, cofactors)
             cache[N] = ret
             return ret
 
@@ -116,6 +118,21 @@ def unique_prime_factor_certs(N: int, cache: dict[int, PrattCert]) -> Iterator[P
             while remain % p.N == 0:
                 remain //= p.N
 
+def test_certs() -> None:
+    certs: dict[int, PrattCert] = {}
+    for p in misc.modest_primes:
+        c = pratt_cert(p, certs)
+        assert c
+        assert c == certs[p]
+    verify_certs(certs)
+
+def test_composite() -> None:
+    certs: dict[int, PrattCert] = {}
+    for n in range(misc.modest_prime_limit):
+        if not n in misc.modest_primes:
+            assert pratt_cert(n, certs) is None
+    verify_certs(certs)
+
 if __name__ == '__main__':
     import sys
     certs: dict[int, PrattCert] = {}
@@ -124,4 +141,6 @@ if __name__ == '__main__':
             str(c.N) for c in unique_prime_factor_certs(eval(s), certs)))
     for prime in sorted(certs.keys()):
         cert = certs[prime]
-        print(prime, 'gen', cert.generator, 'co', ' '.join(str(c.N) for c in cert.cofactors))
+        print(prime, 'gen', cert.generator, 'co',
+              ' '.join(str(c.N) for c in cert.cofactors))
+    verify_certs(certs)
