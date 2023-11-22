@@ -3,7 +3,7 @@ import misc
 
 from dataclasses import dataclass
 import math
-from typing import Tuple
+from typing import Iterator, Tuple
 
 Point = Tuple[int, int]
 
@@ -211,24 +211,51 @@ def test_find_order() -> None:
             print('Order is', 65537 - 512 + i)
         zb = curve.add(z, zb)
 
-def qtry_one(n: int, l: int) -> None:
-    print('.', flush=True, end='')
+def qtry_one(n: int, B1: int) -> None:
     import random
     a = random.randint(1,1000000) % n
     x = random.randint(1,1000000) % n
     y = random.randint(1,1000000) % n
     curve = Elliptic.curve(x, y, a, n)
-    z = (x,y)
-    #ss = l
-    limit = int(l * math.log(l))
-    #ss = l * misc.floor_sqrt(l)[0]
-    #ss = l * l
-    for p in misc.sieve_primes_to(limit):
-        z = curve.mult(z, p)
-        pp = p * p
-        while pp < limit:
-            z = curve.mult(z, p)
+    Q = (x,y)
+    print('[', flush=True, end='')
+    for p in misc.sieve_primes_to(B1):
+        pp = p
+        while pp < B1:
+            Q = curve.mult(Q, p)
             pp *= p
+    B2 = B1 * 100
+    B1 -= B1 % 30                       # Adjust to a multiple of 30.
+    if B1 == 0:
+        return
+    print(']', flush=True, end='')
+    try:
+        prod = 1
+        Q1 = Q
+        Q2 = curve.double(Q1)
+        Q4 = curve.double(Q2)
+        Q7 = curve.add(Q4, curve.add(Q2, Q1))
+        Q11 = curve.add(Q7, Q4)
+        Q13 = curve.add(Q11, Q2)
+        Q30 = curve.add(Q13, curve.add(Q13, Q4))
+
+        Q = curve.mult(Q30, B1 // 30)
+        for _ in range(B1, B2, 6):
+            # Todo - we could center on 15 mod 30 and use 2,4,8,14.
+            prod = prod * (Q[0] - Q1[0]) % curve.p
+            prod = prod * (Q[0] - Q7[0]) % curve.p
+            prod = prod * (Q[0] - Q11[0]) % curve.p
+            prod = prod * (Q[0] - Q13[0]) % curve.p
+            Q = curve.add(Q, Q30)
+    except:
+        print('!')
+        raise
+    # TODO - detect if we get a zero above somewhere.
+    g = math.gcd(prod, curve.p)
+    assert g != curve.p
+    if 1 < g < curve.p:
+        print('*')
+        raise misc.FoundFactor(curve.p, g)
 
 def qtry_ret(n: int, l: int) -> int:
     try:
@@ -238,23 +265,46 @@ def qtry_ret(n: int, l: int) -> int:
         print(f'Found factor {e.args[1]} at {l=}')
         return e.args[1]
 
-def qtry(n: int) -> None:
-    for l in range(10, 1000000):
-        print(l)
-        qtry_one(n, l)
+_SCHEDULE = (
+    (15,       2000,     25),
+    (20,      11000,     90),
+    (25,      50000,    300),
+    (30,     250000,    700),
+    (35,    1000000,   1800),
+    (40,    3000000,   5100),
+    (45,   11000000,  10600),
+    (50,   43000000,  19300),
+    (55,  110000000,  49000),
+    (60,  260000000, 124000),
+    (65,  850000000, 210000),
+    (70, 2900000000, 340000))
+
+def schedule(min_digits:int = 0) -> Iterator[int]:
+    for digits, B1, count in _SCHEDULE:
+        if digits >= min_digits:
+            for _ in range(count):
+                yield B1
+    while True:                         # Not that we actually get here...
+        yield B1
+
+def qtry_single(n: int) -> int:
+    for b1 in schedule():
+        f = qtry_ret(n, b1)
+    print('Found factor', f, 'of', n)
+    return f
 
 def qtry_parallel(n: int) -> None:
     import joblib
     try:
         joblib.Parallel(n_jobs=-1, batch_size=1)(
-            joblib.delayed(qtry_one)(n, l) for l in range(100, 1000000))
+            joblib.delayed(qtry_one)(n, b1) for b1 in schedule())
     except misc.FoundFactor as e:
         print('Found factor', e.args[1], 'of', e.args[0], flush=True)
 
 def qtry_parallel10(n: int) -> None:
     import joblib
     jobs = joblib.Parallel(n_jobs=-1, batch_size=1, return_as='generator')(
-        joblib.delayed(qtry_ret)(n, l) for l in range(100, 1000000))
+        joblib.delayed(qtry_ret)(n, l) for l in schedule())
     count = 0
     for f in jobs:
         if f != 0:
@@ -274,4 +324,4 @@ def retry(curve, z, i):
 if __name__ == '__main__':
     #qtry_parallel((1<<101)-1)
     #qtry_parallel((1<<137)-1)
-    qtry_parallel10((1<<149)-1)
+    qtry_parallel((1<<149)-1)
