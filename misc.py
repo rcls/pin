@@ -3,6 +3,8 @@ from math import gcd, sqrt
 import itertools
 from typing import Any, Iterator, Tuple
 
+class FoundFactor(Exception): pass
+
 def sieve_primes_to(n: int) -> Iterator[int]:
     yield 2
     n2 = n // 2
@@ -97,10 +99,7 @@ def floor_sqrt(a: int) -> Tuple[int, int]:
         assert a >= 0
         return a, a
     # Find the smallest power of two such that s² >= a.
-    if a.bit_length() == 1:
-        twos = a.bit_length() // 2
-    else:
-        twos = (a.bit_length() + 1) // 2
+    twos = (a.bit_length() + 1) // 2
     s = 1 << twos
     ssq = 1 << 2*twos
     while ssq > a:

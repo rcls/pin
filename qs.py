@@ -9,8 +9,6 @@ from dataclasses import dataclass
 
 import math
 
-class FoundFactor(Exception): pass
-
 @dataclass
 class Relation:
     sqrt: int
@@ -197,7 +195,7 @@ class Sieve:
         if f == self.N:
             f = math.gcd(self.N, x + y)
         if 1 < f < self.N:
-            raise FoundFactor(self.N, f)
+            raise misc.FoundFactor(self.N, f)
 
 class SieveBlock:
     S: Sieve
@@ -234,7 +232,7 @@ class SieveBlock:
             if k % p == 0:
                 assert k // p % p != 0  # We only deal with square free k.
                 if S.N % p == 0:
-                    raise FoundFactor(S.N, p)
+                    raise misc.FoundFactor(S.N, p)
                 sqrtkN_mod_p = sqrtkN % p
                 pos = -sqrtkN_mod_p % p
                 self.strides.append(p)
@@ -247,7 +245,7 @@ class SieveBlock:
             if ring_sqrt is None:
                 continue
             if ring_sqrt == 0:
-                raise FoundFactor(S.N, p)
+                raise misc.FoundFactor(S.N, p)
 
             inv_2sqrt = pow(2 * ring_sqrt, -1, p)
             prev_log16pp = 0 #int(round(16 * math.log2(p)))
@@ -354,7 +352,6 @@ if __name__ == '__main__':
     # 42 secs, B=100000
     #s = Sieve(9223372088242534787 * 18446744556051857693, maxB = 100000)
 
-    # 711 secs, B=200000 [1].
     # 150 bits.
     # 500000, base len 20836, sieve 391, elim 231, total 622
     # 400000, base len 16923, sieve 409, elim 145, total 556
@@ -413,7 +410,7 @@ if __name__ == '__main__':
     print('Sieving took', sieve_end - start_sieve)
     try:
         s.eliminate()
-    except FoundFactor as e:
+    except misc.FoundFactor as e:
         print('Factor', e.args[1])
     end = time.time()
     print('Elimination took', end - sieve_end)
