@@ -10,20 +10,38 @@ def pollard_rho(N: int) -> int:
         if N % p == 0:
             return p
     # print(f'pollard_rho {N}')
+    # TODO - for recursive usage, repeating the same sequence is crap.
+    # If we find a composite factor then we will fruitlessly repeat work
+    # trying to factor it.
     for i in range(5, N, 2):
         if N % i == 0:
             return i                    # Just in case!
         slow = i
         fast = i
+        check = 1
+        climit = 1
+        ccount = 0
         while True:
             slow = (slow * slow) % N + 1
             fast = (fast * fast) % N + 1
             fast = (fast * fast) % N + 1
             if slow == fast:
                 break
-            g = gcd(slow - fast, N)
-            if g != 1:
-                return g
+            check = check * (slow - fast) % N
+            if check == 0:
+                # slow-fast gave us a final factor...
+                g = gcd(slow - fast, N)
+                if g != 1:
+                    return g
+                break
+            ccount += 1
+            if ccount >= climit:
+                # Do the gcd every few iterations, quadratic backoff.
+                check = gcd(check, N)
+                if check != 1:
+                    return check
+                ccount = 0
+                climit += 1
     assert False, f'Failed on {N}'
 
 def factor_repeats(N: int, factors: list[int]) -> Iterator[int]:
