@@ -1,271 +1,363 @@
+#!/usr/bin/python3
+
+# On 4096 bit numbers, the curve operations are about 6 times faster than
+# Weierstrauss.  But at 150 bits, I think the python overheads dominate.
 
 import misc
 
-from dataclasses import dataclass
 import math
+from dataclasses import dataclass
 from typing import Iterator, Tuple
 
-Point = Tuple[int, int]
+# Projective coordinates (X:Z) with x = X/Z.
+@dataclass(frozen=True)
+class Point:
+    X: int
+    Z: int
 
-@dataclass
-class Elliptic:
-    # y² ≡ x³ + a·x + b (mod p).
-    a: int
-    # b is never actually needed except when we verify a point is valid.
-    b: int
+# Raised if our computations go wrong without a factorization.
+class Unexpected(Exception): pass
+
+class MontgomeryCurve:
     p: int
-    negp: int                           # Python sucks.
+    A: int
+    Am2d4: int                          # (A-2)/4
+    # We never use B, or the y co-ordinates.  For validation we only care
+    # about whether or not B·y² ≡ x³ + A·x² + x is a q.r. or not.  j is
+    # the Jacobi symbol (B|p).  [For composite p, we use the Jacobi symbol
+    # rather than strictly whether or not B is a q.r.]
+    j: int
+
+    def invmod(self, x):
+        return pow(x, -1, self.p)
+
+    def moddiv(self, x, y):
+        # x/y mod p
+        return x * pow(y, -1, self.p) % self.p
+
+    def __init__(self, p: int, Am2d4: int, j: int):
+        self.p = p
+        self.Am2d4 = Am2d4
+        self.A = (Am2d4 * 4 + 2)
+        assert self.A % p != 2 and -self.A % p != 2
+        self.j = j
 
     @staticmethod
-    def curve(x, y, a, p) -> 'Elliptic':
-        if a >= p or a <= p // -2:
-            a = a % p
-        assert a != 0
-        b = (y * y - x * x % p * x - a * x) % p
-        assert b != 0
-        return Elliptic(a, b, p, -p)
+    def curve_on(p: int, Am2d4: int, x: int, z: int = 1):
+        A = Am2d4 * 4 + 2
+        j = misc.jacobi((x * x % p + A * x + 1) * x, p) * misc.jacobi(z, p)
+        return MontgomeryCurve(p, Am2d4, j)
 
-    def verify(self, z: Point) -> None:
-        x, y = z
-        if x == 0 == y:
-            return
-        assert (x * x % self.p * x + self.a * x + self.b - y * y) % self.p == 0
+    def a_validate(self, x: int) -> None:
+        p = self.p
+        assert misc.jacobi((x * x % p + self.A * x + 1) * x, p) == self.j
 
-    def neg(self, z: Point) -> Point:
-        x, y = z
-        return x, -y
+    def validate(self, P: Point) -> None:
+        # If we cared we could avoid the modular inversion by doing a projective
+        # calculation.
+        self.a_validate(self.reduce(P))
 
-    def canon(self, z: Point) -> Point:
-        x, y = z
-        return x % self.p, y % self.p
+    # Extract a factorization after something has gone wrong arithemetically.
+    def gcd_check(self, *args: int) -> None:
+        for x in args:
+            g = math.gcd(x, self.p)
+            if 1 < g < self.p:
+                raise misc.FoundFactor(self.p, g)
 
-    def add(self, z0: Point, z1: Point) -> Point:
-        x0, y0 = z0
-        x1, y1 = z1
-        if x0 == 0 == y0:
-            return z1
-        if x1 == 0 == y1:
-            return z0
-        # Parameterise as x = (1 - u)·x₀ + u·x₁, y = (1 - u)·y₀ + u·y₁
-        # i.e., x = u·(x₁ - x₀) + x₀, y = u·(y₁ - y₀) + y₀,
+    # Map the projective coordinates to affine.
+    def reduce(self, P: Point) -> int:
+        return self.moddiv(P.X, P.Z)
+
+    def eq(self, P: Point, Q: Point) -> int:
+        return (P.X * Q.Z - P.Z * Q.X) % self.p == 0
+
+    def a_add(self, a: int, b: int, n: int) -> int:
+        # s·n = (a·b - 1)² / (a - b)².
+        # s = (a·b - 1)² / [n·(a - b)²]
+        p = self.p
+        abm1 = a * b % p - 1
+        amb = a - b
+        return self.moddiv(abm1 * abm1 % p, amb * amb % p * n % p)
+
+    def a_double(self, x:int) -> int:
+        # We intentionally do little to simplify:
         #
-        # Express x³ - y² + a·x + b ≡ 0 in terms of u.
-        xs = x1 - x0
-        ys = y1 - y0
-        if xs != 0 and xs != self.p and xs != self.negp:
-            # Normal case.
-            identical = False
-            pass
-        elif ys == 0 or ys == self.p or ys == self.negp:
-            identical = True
-            # In the exceptional case where z0 == z1, instead we take a tangent.
-            #
-            # Differentiating: 2·y·dy = (3·x² + a)·dx.  So take the slopes:
-            xs = y0 * 2
-            ys = (x0 * x0 * 3 + self.a) % self.p
-        elif (y0 + y1) % self.p == 0:
-            # The identity…  Represent as (0,0) which is not an otherwise valid
-            # point.
-            return 0, 0
+        # (x² - 1)² / (4(x³ + Ax² + x))
+        p = self.p
+
+        xm1 = x * x - 1
+        num = xm1 * xm1 % p
+
+        den = ((x + self.A) * x % p + 1) * x * 4 % p
+
+        return self.moddiv(num, den)
+
+    # Add P+Q given N = P-Q.
+    def add(self, P: Point, Q: Point, N: Point) -> Point:
+        # Special cases.  The first two are essential to apply if we hit them,
+        # the others are optional.
+        if N.Z == 0:
+            return self.double(P)       # P-Q = O, P=Q, P+Q = 2P
+        if N.X == 0:
+            D = self.double(P)
+            return Point(D.Z, D.X)      # P-Q = T, P+Q = T + 2P = T + 2Q
+        if P.Z == 0:
+            return Q                    # P = O, P+Q = Q
+        if Q.Z == 0:
+            return P                    # Q = O, P+Q = P
+
+        if P.X == 0:
+            return Point(Q.Z, Q.X)      # P=T, invert Q.
+        if Q.X == 0:
+            return Point(P.Z, P.X)      # Q=T, invert P.
+
+        X0, Z0 = P.X, P.Z
+        X1, Z1 = Q.X, Q.Z
+
+        # The affine coordinate of the result r is given by
+        # r·n = (p·q - 1)² / (p - q)².
+
+        # Doing this projectively, we get four multiplies and two squarings:
+        # r·n = (X₀·X₁ - Z₀·Z₁)² / (X₀·Z₁ - Z₀·X₁)²
+        #
+        # But we can save some multiplications:
+        #
+        # 2(p·q - 1) = (p - 1)(q + 1) + (p + 1)(q - 1)
+        # 2(p   - q) = (p - 1)(q + 1) - (p + 1)(q - 1)
+        #
+        # Noting the shared addends, the RHS above has just two multiplies, even
+        # in projective form, replacing four in our first version.  The factors
+        # of 2 cancel and so can be ignored.
+        p = self.p
+        PmQp = (X0 - Z0) * (X1 + Z1) % p
+        PpQm = (X0 + Z0) * (X1 - Z1) % p
+
+        num = PmQp + PpQm
+        den = PmQp - PpQm
+
+        r = Point(num * num % p * N.Z % p, den * den % p * N.X % p)
+        if r.X == 0 and N.Z != 0 and num != 0 and num != p:
+            gcd_check(num, N.Z)
+        if r.Z == 0 and N.X != 0 and den != 0:
+            gcd_check(den, N.X)
+
+        if r.X == 0 and r.Z == 0:
+            raise Unexpected(N, P, Q)
+        return r
+
+    def double(self, P: Point) -> Point:
+        # Special cases are P = O or T.  In both cases the result is O.
+        if P.X == 0 or P.Z == 0:
+            return Point(1, 0)
+
+        # In affine coordinates: (x² - 1)² / (4(x³ + Ax² + x))
+        #
+        # The denominator can be rewritten as:
+        #
+        #     4x · [(x + 1)² + ¼(A-2)·4x]
+        #
+        # To homogenize, we need to replace 4x with 4XZ.  As we already need
+        # (x²-1)² = (x+1)²·(x-1)² for the numerator, we can use the equality
+        # 4x = (x+1)² - (x-1)² to avoid the multiplication X·Z.
+        p = self.p
+        X, Z = P.X, P.Z
+        XpZ = X + Z
+        XmZ = X - Z
+        XpZ2 = XpZ * XpZ % p
+        XmZ2 = XmZ * XmZ % p
+        fourXZ = XpZ2 - XmZ2
+
+        # We assume ¼(A-2) is small, and so skip the reduction of ¼(A-2)·4XZ.
+        r = Point(XpZ2 * XmZ2 % p,
+                  fourXZ * (XpZ2 + self.Am2d4 * fourXZ) % p)
+        if r.X != 0 or r.Z != 0:
+            return r
+
+        # Check everything...
+        print('Collide')
+        self.gcd_check(X, Z, XpZ, XmZ)
+        raise Unexpected(P)               # Something wierd happened.
+
+    def ladder2(self, n: int, P: Point) -> Tuple[Point, Point]:
+        # Return ([n]P, [n+1]P).
+        if n == 0:
+            return Point(1, 0), P
+
+        R, S = P, self.double(P)
+        #r, s = 1, 2
+
+        # Note that we skip the most significant 1 bit.
+        for i in reversed(range(n.bit_length() - 1)):
+            if n & (1 << i) == 0:
+                R, S = self.double(R), self.add(R, S, P)
+                #r, s = 2*r, r+s
+            else:
+                R, S = self.add(R, S, P), self.double(S)
+                #r, s = r+s, 2*s
+
+        #assert r == n and s == r + 1
+        return R, S
+
+    def ladder_mult(self, n: int, P: Point) -> Point:
+        if n == 0:
+            return Point(1, 0)
+
+        # Short circuit factors of 2, we're not doing crypto.
+        while n & 1 == 0:
+            n >>= 1
+            P = self.double(P)
+
+        if n == 1:
+            return P
+
+        R, S = self.ladder2(n // 2, P)
+        # As above, but only return the first item.
+        if n & 1 == 0:
+            # If n is even, n = 2(n/2)
+            return self.double(R)
         else:
-            # x₀ ≡ x₁ and y₀ ≢ ±y₁.  We have y₀² ≡ y₁², and so a factorisation
-            # of p.
-            g = math.gcd(ys, self.p)
-            assert 1 < g < self.p
-            # Maybe one day we will hit this?
-            print(self.p, g)
-            assert False
-            raise misc.FoundFactor(self.p, g)
-
-        # x³  = xs³·u³ + 3·xs²·x₀·u² + 3·xs·x₀²·u + x₀³
-        # y²  =               ys².u² + 2·ys·y₀ ·u + y₀²
-        # a·x =                        a·xs    ·u + a·x0
-        # b = b
-        xs2 = xs * xs % self.p
-        # Note that c2 is not reduced.
-        c3 = xs2 * xs % self.p
-        c2 = xs2 * (x0 * 3) - ys * ys
-        #c1 = x0x0_3_p_a * xs - ys * (y0 * 2)
-        if c3 == 0:
-            # xs³ is a multiple of p, so we must have a common factor.
-            g = math.gcd(xs, self.p)
-            assert 1 < g < self.p
-            raise misc.FoundFactor(self.p, g)
-        # Special handling for the indentical case case again...
-        if identical:
-            # Now our polynomial has a double root at u=0 and the solution
-            # we want us c₃·u + c₂ = 0
-            d = c2
-        else:
-            # c₀ = x₀³ - y₀² + a·x₀ + b ≡ 0 by assumption.
-            #
-            # The polynomial equation is c₃·u³ + c₂·u² + c₁·u ≡ 0, which is
-            # satisfied by u=0 and u=1.  (The latter implies, c₃ + c₂ + c₁ ≡ 0.)
-            #assert (c1 + c2 + c3) % self.p == 0
-            #
-            # Dividing by u gives c₃·u² + c₂·u + c₁, and then dividing by u-1
-            # gives c₃·u + c₃ + c₂, so u = -(c₃ + c₂) / c₃.
-            d = c3 + c2
-
-        try:
-            uneg = d % self.p * pow(c3, -1, self.p) % self.p
-        except ValueError:
-            g = math.gcd(self.p, c3)
-            assert 1 < g < self.p
-            raise misc.FoundFactor(self.p, g)
-
-        # Now compute x and y at u = -uneg, and flip the sign of y.
-        return (x0 - xs * uneg) % self.p,  (ys * uneg - y0) % self.p
-
-    def double(self, z: Point) -> Point:
-        # Specialize add() for the doubling case.
-        x, y = z
-        if x == 0 == y:
-            return z
-
-        xs = y * 2
-        ys = (x * x * 3 + self.a) % self.p
-
-        xs2 = xs * xs % self.p
-        c3 = xs2 * xs % self.p
-        c2 = xs2 * (x * 3) - ys * ys
-
-        if c3 == 0:
-            # xs³ is a multiple of p, so we must have a common factor.
-            g = math.gcd(xs, self.p)
-            assert 1 < g < self.p, f'{xs}, {self}'
-            raise misc.FoundFactor(self.p, g, xs)
-
-        try:
-            uneg = c2 % self.p * pow(c3, -1, self.p) % self.p
-        except ValueError:
-            g = math.gcd(self.p, c3)
-            assert 1 < g < self.p
-            raise misc.FoundFactor(self.p, g)
-        return (x - xs * uneg) % self.p,  (ys * uneg - y) % self.p
-
-    def mult(self, n: int, z: Point) -> Point:
-        if n == 0 or z == (0, 0):
-            return 0, 0
-        if n < 0:
-            n = -n
-            z = (z[0], -z[1])
-        result = (0,0)
-        power2 = z
-        # Do the calculation bottom up.  For the ECM, n (mod 2ᵏ) passes through
-        # all possible values reasonably often, giving us more chance of hitting
-        # repeated factors of the order.
-        for i in range(n.bit_length() - 1):
-            if n & (1 << i):
-                result = self.add(result, power2)
-            power2 = self.double(power2)
-        return self.add(power2, result)
+            # If n=2m+1 is odd, n = m+(m+1)
+            return self.add(R, S, P)
 
 def test_basic() -> None:
-    curve = Elliptic.curve(4, 5, 7, 65537)
-    z = (4, 5)
-    curve.verify(z)
-    print(curve)
-    z2 = curve.add(z, z)
-    curve.verify(z2)
-    z3 = curve.add(z, z2)
-    curve.verify(z3)
-    z4 = curve.add(z, z3)
-    curve.verify(z4)
-    assert curve.add(z2, z) == z3
-    assert curve.add(z3, z) == z4
-    assert curve.add(z2, z2) == z4
-    nz = curve.neg(z)
-    curve.verify(nz)
-    assert curve.add(z2, nz) == z
-    assert curve.add(z3, nz) == z2
-    assert curve.add(z4, nz) == z3
-    assert curve.add(z3, curve.neg(z4)) == curve.canon(nz)
+    curve = MontgomeryCurve(65537, 25, -1)
 
-def test_identity() -> None:
-    import pytest
-    curve = Elliptic.curve(4, 5, 7, 65537)
-    z = (4, 5)
-    nz = curve.neg(z)
-    curve.verify(nz)
-    assert curve.add(z, nz) == (0, 0)
-    assert curve.add(z, (0,0)) == z
-    assert curve.add((0,0), z) == z
+    P = Point(3, 5)
+    x = curve.reduce(P)
+    curve.a_validate(x)
 
-def test_mult() -> None:
-    curve = Elliptic.curve(4, 5, 7, 65537)
-    z = (4, 5)
-    direct = (0, 0)
-    for i in range(1, 22):
-        direct = curve.add(direct, z)
-        curve.verify(direct)
-        assert direct == curve.mult(i, z), f'{i}'
+    P2 = curve.double(P)
+    x2 = curve.a_double(x)
+    assert curve.reduce(P2) == x2
+    curve.a_validate(x2)
 
-def test_find_order() -> None:
-    curve = Elliptic.curve(4, 5, 7, 65537)
-    z = (4, 5)
-    # The order should be between 65537 ± 512
-    zb = curve.mult(65537 - 512, z)
-    for i in range(1024):
-        if zb == (0, 0):
-            print('Order is', 65537 - 512 + i)
-        zb = curve.add(z, zb)
+    P3 = curve.add(P, P2, P)
+    x3 = curve.a_add(x, x2, x)
+    assert curve.reduce(P3) == x3
+    curve.a_validate(x3)
 
-def qtry_one(n: int, B1: int) -> None:
+    P4 = curve.double(P2)
+    x4 = curve.a_double(x2)
+    assert curve.reduce(P4) == x4
+    curve.a_validate(x4)
+
+    P4a = curve.add(P, P3, P2)
+    x4a = curve.a_add(x, x3, x2)
+    assert curve.reduce(P4a) == x4a
+    assert x4a == x4
+
+def test_ladder() -> None:
+    curve = MontgomeryCurve(65537, 27, -1)
+    O = Point(1, 0)
+    P = Point(3, 4)
+    b = curve.reduce(P)
+    multx = [O, P]
+    multa = [0, b]
+    for i in range(2, 1000):
+        if i % 2 == 0:
+            multx.append(curve.  double(multx[i//2]))
+            multa.append(curve.a_double(multa[i//2]))
+        else:
+            multx.append(curve.  add(multx[i-1], P, multx[i-2]))
+            multa.append(curve.a_add(multa[i-1], b, multa[i-2]))
+
+    for i in range(1, 1000):
+        assert curve.reduce(multx[i]) == multa[i]
+
+    for i in range(1, 1000):
+        L = curve.ladder_mult(i, P)
+        assert multa[i] == curve.reduce(L), f'{i}'
+
+def test_order() -> None:
+    curve = MontgomeryCurve(65537, 27, -1)
+    P = Point(3, 4)
+    base = 65536 - 512
+    Q0, Q1 = curve.ladder2(base, P)
+    assert curve.eq(Q0, curve.ladder_mult(base, P))
+    order = None
+    for i in range(0, 2048):
+        Q0, Q1 = Q1, curve.add(Q1, P, Q0)
+        if Q1.Z == 0:
+            order = base + i + 2
+            print(i, order, Q1, curve.ladder_mult(order, P))
+    assert order is not None
+
+def test_order_long() -> None:
+    curve = MontgomeryCurve(65537, 27, -1)
+    P = Point(3, 4)
+    Q0, Q1 = Point(1, 0), P
+    order = None
+    for i in range(2, 65536 + 512):
+        Q0, Q1 = Q1, curve.add(Q1, P, Q0)
+        if Q1.Z == 0:
+            order = i
+            print(i, Q1, curve.ladder_mult(i, P))
+    assert order is not None
+
+def btry_one(n: int, B1: int) -> None:
+    print('.', end='', flush=True)
     import random
-    a = random.randint(1,1000000) % n
-    x = random.randint(1,1000000) % n
-    y = random.randint(1,1000000) % n
-    curve = Elliptic.curve(x, y, a, n)
-    Q = (x,y)
-    print('.', flush=True, end='')
+    Am2d4 = random.randint(1,n - 2)
+    Q = Point(3,4)                      # Doesn't really matter?
+    curve = MontgomeryCurve.curve_on(n, Am2d4, 3, 4)
     for p in misc.sieve_primes_to(B1):
         pp = p
         while pp < B1:
-            Q = curve.mult(p, Q)
+            Q = curve.ladder_mult(p, Q)
             pp *= p
-    B2 = B1 * 100
-    B1 -= B1 % 30                       # Adjust to a multiple of 30.
-    if B1 == 0:
+
+    curve.gcd_check(Q.X, Q.Z)
+
+    if Q.X == 0 or Q.Z == 0:
+        print('Trivial!')
         return
 
     try:
-        prod = 1
-        Q1 = Q
-        Q2 = curve.double(Q1)
+        Q2 = curve.double(Q)
+        Q3 = curve.add(Q, Q2, Q)
         Q4 = curve.double(Q2)
-        Q7 = curve.add(Q4, curve.add(Q2, Q1))
-        Q11 = curve.add(Q7, Q4)
-        Q13 = curve.add(Q11, Q2)
-        Q30 = curve.add(Q13, curve.add(Q13, Q4))
+        Q6 = curve.double(Q3)
+        Q7 = curve.add(Q3, Q4, Q)
+        Q11 = curve.add(Q4, Q7, Q3)
+        Q13 = curve.add(Q6, Q7, Q)
+        Q15 = curve.add(Q13, Q2, Q11)
+        Q30 = curve.double(Q15)
 
-        Q = curve.mult(B1 // 30, Q30)
+        B2 = B1 * 100
+        R0, R1 = curve.ladder2(B1//30, Q30)
+
+        check = Q.Z * Q7.Z % curve.p * Q11.Z % curve.p * Q13.Z % curve.p
+        if check == 0:
+            curve.gcd_check(Q.Z, Q7.Z, Q11.Z, Q13.Z)
+            raise Unexpected(Q.Z, Q7.Z, Q11.Z, Q13.Z)
+
         for _ in range(B1, B2, 30):
-            # Todo - we could center on 15 mod 30 and use 2,4,8,14.
-            prod = prod * (Q[0] - Q1[0]) % curve.p
-            prod = prod * (Q[0] - Q7[0]) % curve.p
-            prod = prod * (Q[0] - Q11[0]) % curve.p
-            prod = prod * (Q[0] - Q13[0]) % curve.p
-            Q = curve.add(Q, Q30)
+            R0, R1 = R1, curve.add(R1, Q30, R0)
+            for L in Q, Q7, Q11, Q13:
+                det = (L.X * R1.Z - L.Z * R1.X) % curve.p
+                if det == 0:
+                    curve.gcd_check(check)
+                    print('Stage 2 trivial')
+                    return
+                # No need to include L.Z again!
+                ncheck = check * det % curve.p * R1.Z % curve.p
+                if ncheck == 0:
+                    curve.gcd_check(check, R1.Z, det)
+                    raise Unexpected(check, R1.Z, det)
+                check = ncheck
     except:
-        print('!')
+        print('!', flush=True)
         raise
-    # TODO - detect if we get a zero above somewhere.
-    g = math.gcd(prod, curve.p)
-    assert g != curve.p
-    if 1 < g < curve.p:
-        print('*')
-        raise misc.FoundFactor(curve.p, g)
-
-def qtry_ret(n: int, l: int) -> int:
     try:
-        qtry_one(n, l)
-        return 0
-    except misc.FoundFactor as e:
-        print(f'Found factor {e.args[1]} at {l=}')
-        return e.args[1]
+        curve.gcd_check(check)
+    except:
+        print('*', flush=True)
+        raise
 
 _SCHEDULE = (
+    # The count is close to B1^¾/11
+    # B1 is close to exp(5/2 * digits/3)
+    # But not really.
     (15,       2000,     25),
     (20,      11000,     90),
     (25,      50000,    300),
@@ -287,31 +379,31 @@ def schedule(min_digits:int = 0) -> Iterator[int]:
     while True:                         # Not that we actually get here...
         yield B1
 
-def qtry_single(n: int) -> int:
-    for b1 in schedule():
-        f = qtry_ret(n, b1)
-    print('Found factor', f, 'of', n)
-    return f
-
-def qtry_parallel(n: int) -> None:
+def btry_parallel(n: int) -> int:
     import joblib
     try:
         joblib.Parallel(n_jobs=-1, batch_size=1)(
-            joblib.delayed(qtry_one)(n, b1) for b1 in schedule())
+            joblib.delayed(btry_one)(n, b1) for b1 in schedule())
+        assert False
     except misc.FoundFactor as e:
         print('Found factor', e.args[1], 'of', e.args[0], flush=True)
-
-def retry(curve, z, i):
-    try:
-        m = curve.mult(i, z)
-        print('  retry succeeds')
-        return m
-    except misc.FoundFactor:
-        print('  retry fails')
-        return None
+        return e.args[1]
 
 if __name__ == '__main__':
-    #qtry_parallel((1<<101)-1)
-    #qtry_parallel((1<<137)-1)
-    for _ in range(10):
-        qtry_parallel((1<<149)-1)
+    import pseudo_prime
+    for n in misc.small_primes:
+        N = (1<<n) - 1
+        if n < 10 or not pseudo_prime.baillie_psw(N):
+            continue
+        print(n)
+        btry_parallel(N)
+    #ltry10((1<<101) - 1)
+    #ltry_parallel((1<<137) - 1)
+    #for _ in range(10):
+        #btry_parallel((1<<137) - 1)
+        #btry_parallel((1<<149) - 1)
+        #btry_parallel((1<<101) - 1)
+        #btry_parallel((1<<161) - 1)
+    #btry_parallel(4378942815107578007)
+    #btry_one((1<<149) - 1, 2000)
+    #pass
