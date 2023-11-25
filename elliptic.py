@@ -144,7 +144,7 @@ class Elliptic:
             raise misc.FoundFactor(self.p, g)
         return (x - xs * uneg) % self.p,  (ys * uneg - y) % self.p
 
-    def mult(self, z: Point, n: int) -> Point:
+    def mult(self, n: int, z: Point) -> Point:
         if n == 0 or z == (0, 0):
             return 0, 0
         if n < 0:
@@ -199,13 +199,13 @@ def test_mult() -> None:
     for i in range(1, 22):
         direct = curve.add(direct, z)
         curve.verify(direct)
-        assert direct == curve.mult(z, i), f'{i}'
+        assert direct == curve.mult(i, z), f'{i}'
 
 def test_find_order() -> None:
     curve = Elliptic.curve(4, 5, 7, 65537)
     z = (4, 5)
     # The order should be between 65537 ± 512
-    zb = curve.mult(z, 65537 - 512)
+    zb = curve.mult(65537 - 512, z)
     for i in range(1024):
         if zb == (0, 0):
             print('Order is', 65537 - 512 + i)
@@ -218,17 +218,17 @@ def qtry_one(n: int, B1: int) -> None:
     y = random.randint(1,1000000) % n
     curve = Elliptic.curve(x, y, a, n)
     Q = (x,y)
-    print('[', flush=True, end='')
+    print('.', flush=True, end='')
     for p in misc.sieve_primes_to(B1):
         pp = p
         while pp < B1:
-            Q = curve.mult(Q, p)
+            Q = curve.mult(p, Q)
             pp *= p
     B2 = B1 * 100
     B1 -= B1 % 30                       # Adjust to a multiple of 30.
     if B1 == 0:
         return
-    print(']', flush=True, end='')
+
     try:
         prod = 1
         Q1 = Q
@@ -239,8 +239,8 @@ def qtry_one(n: int, B1: int) -> None:
         Q13 = curve.add(Q11, Q2)
         Q30 = curve.add(Q13, curve.add(Q13, Q4))
 
-        Q = curve.mult(Q30, B1 // 30)
-        for _ in range(B1, B2, 6):
+        Q = curve.mult(B1 // 30, Q30)
+        for _ in range(B1, B2, 30):
             # Todo - we could center on 15 mod 30 and use 2,4,8,14.
             prod = prod * (Q[0] - Q1[0]) % curve.p
             prod = prod * (Q[0] - Q7[0]) % curve.p
@@ -301,20 +301,9 @@ def qtry_parallel(n: int) -> None:
     except misc.FoundFactor as e:
         print('Found factor', e.args[1], 'of', e.args[0], flush=True)
 
-def qtry_parallel10(n: int) -> None:
-    import joblib
-    jobs = joblib.Parallel(n_jobs=-1, batch_size=1, return_as='generator')(
-        joblib.delayed(qtry_ret)(n, l) for l in schedule())
-    count = 0
-    for f in jobs:
-        if f != 0:
-            count +=1
-            if count == 10:
-                break
-
 def retry(curve, z, i):
     try:
-        m = curve.mult(z, i)
+        m = curve.mult(i, z)
         print('  retry succeeds')
         return m
     except misc.FoundFactor:
@@ -324,4 +313,5 @@ def retry(curve, z, i):
 if __name__ == '__main__':
     #qtry_parallel((1<<101)-1)
     #qtry_parallel((1<<137)-1)
-    qtry_parallel((1<<149)-1)
+    for _ in range(10):
+        qtry_parallel((1<<149)-1)
