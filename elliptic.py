@@ -38,7 +38,9 @@ class MontgomeryCurve:
     def __init__(self, p: int, Am2d4: int, j: int):
         self.p = p
         self.Am2d4 = Am2d4
-        self.A = (Am2d4 * 4 + 2)
+        self.A = Am2d4 * 4 + 2
+        self.gcd_check(Am2d4)
+        self.gcd_check(Am2d4 + 1)
         assert self.A % p != 2 and -self.A % p != 2
         self.j = j
 
@@ -138,10 +140,10 @@ class MontgomeryCurve:
         den = PmQp - PpQm
 
         r = Point(num * num % p * N.Z % p, den * den % p * N.X % p)
-        if r.X == 0 and N.Z != 0 and num != 0 and num != p:
-            gcd_check(num, N.Z)
-        if r.Z == 0 and N.X != 0 and den != 0:
-            gcd_check(den, N.X)
+        if r.X == 0 and num != 0 and num != p:
+            self.gcd_check(num, N.Z)
+        if r.Z == 0 and den != 0:
+            self.gcd_check(den, N.X)
 
         if r.X == 0 and r.Z == 0:
             raise Unexpected(N, P, Q)
@@ -154,13 +156,14 @@ class MontgomeryCurve:
 
         # In affine coordinates: (x² - 1)² / (4(x³ + Ax² + x))
         #
-        # The denominator can be rewritten as:
+        # The numerator is (x+1)²·(x-1)².  We can reuse (x+1)² to rewrite the
+        # denominator as:
         #
         #     4x · [(x + 1)² + ¼(A-2)·4x]
         #
-        # To homogenize, we need to replace 4x with 4XZ.  As we already need
-        # (x²-1)² = (x+1)²·(x-1)² for the numerator, we can use the equality
-        # 4x = (x+1)² - (x-1)² to avoid the multiplication X·Z.
+        # To homogenize, we need to replace 4x with 4XZ.  Again, reusing the
+        # factors of the numerator, we can use the equality 4x = (x+1)² - (x-1)²
+        # to avoid the explicit multiplication X·Z.
         p = self.p
         X, Z = P.X, P.Z
         XpZ = X + Z
@@ -213,13 +216,8 @@ class MontgomeryCurve:
             return P
 
         R, S = self.ladder2(n // 2, P)
-        # As above, but only return the first item.
-        if n & 1 == 0:
-            # If n is even, n = 2(n/2)
-            return self.double(R)
-        else:
-            # If n=2m+1 is odd, n = m+(m+1)
-            return self.add(R, S, P)
+        # If n=2m+1 is odd, n = m+(m+1)
+        return self.add(R, S, P)
 
 def test_basic() -> None:
     curve = MontgomeryCurve(65537, 25, -1)
@@ -253,18 +251,18 @@ def test_ladder() -> None:
     O = Point(1, 0)
     P = Point(3, 4)
     b = curve.reduce(P)
-    multx = [O, P]
-    multa = [0, b]
-    for i in range(2, 1000):
-        if i % 2 == 0:
-            multx.append(curve.  double(multx[i//2]))
-            multa.append(curve.a_double(multa[i//2]))
-        else:
-            multx.append(curve.  add(multx[i-1], P, multx[i-2]))
-            multa.append(curve.a_add(multa[i-1], b, multa[i-2]))
+    multx = [O, P, curve.double(P)]
+    multa = [0, b, curve.a_double(b)]
+    for i in range(3, 1000):
+        multx.append(curve.  add(multx[-1], P, multx[-2]))
+        multa.append(curve.a_add(multa[-1], b, multa[-2]))
 
     for i in range(1, 1000):
         assert curve.reduce(multx[i]) == multa[i]
+
+    for i in range(2, 1000, 2):
+        assert curve.eq(multx[i], curve.double(multx[i//2]))
+        assert multa[i] == curve.a_double(multa[i//2])
 
     for i in range(1, 1000):
         L = curve.ladder_mult(i, P)
@@ -296,17 +294,21 @@ def test_order_long() -> None:
             print(i, Q1, curve.ladder_mult(i, P))
     assert order is not None
 
-def btry_one(n: int, B1: int) -> None:
+def btry_one(n: int, B1: int, Am2d4: int):
+    import time
     print('.', end='', flush=True)
-    import random
-    Am2d4 = random.randint(1,n - 2)
-    Q = Point(3,4)                      # Doesn't really matter?
-    curve = MontgomeryCurve.curve_on(n, Am2d4, 3, 4)
+    start1 = time.time()
+    #import random
+    #Am2d4 = random.randint(1, n - 2)
+    Q = Point(2,1)                      # Doesn't really matter?
+    curve = MontgomeryCurve.curve_on(n, Am2d4, Q.X, Q.Z)
     for p in misc.sieve_primes_to(B1):
         pp = p
-        while pp < B1:
-            Q = curve.ladder_mult(p, Q)
-            pp *= p
+        ppp = pp * p
+        while ppp < B1:
+            pp = ppp
+            ppp *= p
+        Q = curve.ladder_mult(pp, Q)
 
     curve.gcd_check(Q.X, Q.Z)
 
@@ -314,14 +316,15 @@ def btry_one(n: int, B1: int) -> None:
         print('Trivial!')
         return
 
+    start2 = time.time()
     try:
         Q2 = curve.double(Q)
-        Q3 = curve.add(Q, Q2, Q)
-        Q4 = curve.double(Q2)
-        Q6 = curve.double(Q3)
-        Q7 = curve.add(Q3, Q4, Q)
-        Q11 = curve.add(Q4, Q7, Q3)
-        Q13 = curve.add(Q6, Q7, Q)
+        Q3 = curve.add(Q2, Q, Q)
+        Q4 = curve.add(Q3, Q, Q2)
+        Q6 = curve.add(Q4, Q2, Q2)
+        Q7 = curve.add(Q4, Q3, Q)
+        Q11 = curve.add(Q7, Q4, Q3)
+        Q13 = curve.add(Q7, Q6, Q)
         Q15 = curve.add(Q13, Q2, Q11)
         Q30 = curve.double(Q15)
 
@@ -342,7 +345,11 @@ def btry_one(n: int, B1: int) -> None:
                     print('Stage 2 trivial')
                     return
                 # No need to include L.Z again!
-                ncheck = check * det % curve.p * R1.Z % curve.p
+                #
+                # Do we actually need the R1.Z check here?  The chance of it
+                # hitting appears negligable as R1 = [30n]Q & we should have
+                # already covered the factors of 30n.
+                ncheck = check * det % curve.p #* R1.Z % curve.p
                 if ncheck == 0:
                     curve.gcd_check(check, R1.Z, det)
                     raise Unexpected(check, R1.Z, det)
@@ -355,11 +362,12 @@ def btry_one(n: int, B1: int) -> None:
     except:
         print('*', flush=True)
         raise
+    end = time.time()
+    #print(start2 - start1, end - start2)
 
 _SCHEDULE = (
-    # The count is close to B1^¾/11
-    # B1 is close to exp(5/2 * digits/3)
-    # But not really.
+    #(5, 100, 4),
+    #(10, 500, 10),
     (15,       2000,     25),
     (20,      11000,     90),
     (25,      50000,    300),
@@ -381,31 +389,84 @@ def schedule(min_digits:int = 0) -> Iterator[int]:
     while True:                         # Not that we actually get here...
         yield B1
 
-def btry_parallel(n: int) -> int:
+def btry_parallel(n: int, min_digits:int = 0) -> int:
     import joblib
     try:
         joblib.Parallel(n_jobs=-1, batch_size=1)(
-            joblib.delayed(btry_one)(n, b1) for b1 in schedule())
+            joblib.delayed(btry_one)(n, b1, sqAm2d4 * (sqAm2d4 + 1))
+            for sqAm2d4, b1 in enumerate(schedule(min_digits), 1))
         assert False
     except misc.FoundFactor as e:
-        print('Found factor', e.args[1], 'of', e.args[0], flush=True)
+        print('Found factor', e.args[1]) #, 'of', e.args[0], flush=True)
         return e.args[1]
 
+def drive(n: int) -> int|None:
+    for p in misc.modest_primes_list:
+        if p * p > n:
+            return None
+        if n % p == 0:
+            return p
+    if n < misc.modest_prime_limit * misc.modest_prime_limit:
+        return None
+
+    return btry_parallel(n)
+
 if __name__ == '__main__':
-    import pseudo_prime
-    for n in misc.small_primes:
-        N = (1<<n) - 1
-        if n < 10 or not pseudo_prime.baillie_psw(N):
+    import sys, pseudo_prime
+    sys.set_int_max_str_digits(1<<30)
+    if len(sys.argv) == 2:
+        S = sys.argv[1]
+        N = eval(S)
+        if pseudo_prime.baillie_psw(N):
+            print('Probable prime')
+        else:
+            print('Factor', S)
+            btry_parallel(N)
+        sys.exit(0)
+    elif len(sys.argv) == 3:
+        S = sys.argv[1]
+        N = eval(S)
+        btry_parallel(N, eval(sys.argv[2]))
+        sys.exit(0)
+    import math, mersenne
+    for p in misc.modest_primes_list:
+        if p <= 1277:
             continue
-        print(n)
-        btry_parallel(N)
-    #ltry10((1<<101) - 1)
-    #ltry_parallel((1<<137) - 1)
-    #for _ in range(10):
-        #btry_parallel((1<<137) - 1)
-        #btry_parallel((1<<149) - 1)
-        #btry_parallel((1<<101) - 1)
-        #btry_parallel((1<<161) - 1)
+        if p > 1500:
+            break
+        if p in (523, 727, 751, 809, 971, 983, 997, 1061, 1277, 1237):
+            continue
+        if mersenne.Mersenne(p).is_prime():
+            continue
+        N = (1<<p) - 1
+        print(f'M({p}) = {N}')
+        f = drive(N)
+        assert f is not None
+        print(f'M({p}) has factor {f} (bits: {math.log2(f):.2f})')
+    # 1061:473
+    # 1237:230
+    # 1277
+    # 1283:132
+
+    # 727:323
+    # 523:226
+    # 751:217
+    # 809:201
+    # 997:187
+    # 971:174
+    # 983:140
+    #
+    # 293:85
+    # 563:81
+    # 647:78
+    # 739:77
+    # 599:74
+    # 347:74
+    # 149:66
+    # 137:65
+    # 433:64
+    # (math.factorial(62) - 1)//13143173//458476324671361
+    # ...352600227238301502049958597925403
     #btry_parallel(4378942815107578007)
     #btry_one((1<<149) - 1, 2000)
     #pass
