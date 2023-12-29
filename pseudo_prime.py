@@ -173,10 +173,10 @@ def test_vpsp() -> None:
 if __name__ == '__main__':
     import constants, sys, time
     sys.set_int_max_str_digits(1000000)
-    args = [eval(sys.argv[i]) for i in range(1, len(sys.argv))]
+    args = list(map(eval, sys.argv[1:]))
     if len(args) == 1:
         st = time.time()
-        if strong_frobenius_a_star(args[0]):
+        if baillie_psw(args[0]):
             print(f'{sys.argv[1]}: Probable prime')
         else:
             print(f'{sys.argv[1]}: Composite')

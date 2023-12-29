@@ -72,7 +72,7 @@ def is_square(a: int) -> bool:
     # Find the smallest power of two such that s² >= a.
     #
     # If a is a power of 2, a = 2^{a.bit_length() - 1} and so take
-    # 2^{½a.bit_length()}.
+    # 2^{a.bit_length()/2}.
     #
     if a.bit_length() == 1:
         twos = a.bit_length() // 2

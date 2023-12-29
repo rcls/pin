@@ -239,7 +239,7 @@ def euclid(xx: list[int], yy: list[int], p: int) -> Tuple[
     poly_mult_scalar_in_place(bb, monique, p)
     return k_b_x, k_b_y, bb
 
-if __name__ == '__main__':
+def test_add_sub() -> None:
     a = [1,1,1,1,1,1]
     b = [1,1,1]
 
@@ -248,6 +248,7 @@ if __name__ == '__main__':
 
     print(poly_mult([1,1,1], [1,-1,1], 5))
 
+def test_basic() -> None:
     m = Monic(11, [1, 0, 1, 0, 1])
     for i in range(1, len(m.small_pow)):
         assert m.small_pow[i] == m.multx(m.small_pow[i-1])
@@ -255,6 +256,7 @@ if __name__ == '__main__':
     assert m.mult([1,1,1],[1,-1,1]) == [0,0,0,0]
     assert m.crack() == 2              # Splits into 'unknown' degree 2 factors.
 
+def test_7() -> None:
     assert Monic(7, [4,3,4,1]).crack() is None
     assert Monic(7, [6,6,6,4,1]).crack() is None
     print(poly_mult([4,3,4,1], [6,6,6,4,1], 7))

@@ -62,15 +62,14 @@ def pocklington_generate(p: int, n: int) -> Iterator[Tuple[int, int]]:
             print('Loading big bertha')
         except FileNotFoundError:
             pass
-    # Pre-reduce p and smart_t modulo each element of plist.  Python doesn't
+    # Pre-reduce p and start_t modulo each element of plist.  Python doesn't
     # seem to give a nice way to parallelize this...
     p_mod = array.array('I')
     p_mod.extend(p % q for q in plist)
     start_t_mod = array.array('I')
     start_t_mod.extend(start_t % q for q in plist)
     print('Reduction done')
-    # The range bound is arbitrary and should be quite a lot more than what is
-    # necessary.
+    # The range bound is arbitrary and should be more than what is necessary.
     for i in range(2, n * n * n, 2):
         t = start_t + i
         N = t * p + 1
@@ -104,23 +103,21 @@ def pocklington_try_one(N: int, t: int, p: int) -> bool:
     print('Passes fermat...', t & 65535, file=sys.stderr, flush=True)
     # If N is composite, then it has a prime factor q ≤ √N < p.
     #
-    # As we pass the Fermat test 2^(N-1) ≡ 1 mod N, then 2^(N-1) ≡ 1 mod q.
+    # We pass the Fermat test, 2^(p·t) = 2^(N-1) ≡ 1 mod N, and hence mod q
+    # also.
     #
-    # As q < p we have gcd(q-1, p) = 1, so that p is invertible mod (q-1), say
-    # p·u ≡ 1 mod (q-1).
+    # Also, 2^(q-1) ≡ 1 mod q, so that 2^gcd(p·t, q-1) ≡ 1 mod q.
     #
-    # Therefore (mod q), 2^t = 2^{(N-1)/p} ≡ 2^{(N-1)u} ≡ 1^u = 1.
+    # As q-1 < p, we have gcd(p,q-1) = 1 so that gcd(p·t,q-1) = gcd(t,q-1) is a
+    # factor of t.  Hence, 2^t ≡ 1 mod q also.  I.e., q | 2^t - 1.
     #
-    # Now q divides both N and 2^t - 1, and so also the gcd below.
+    # Thus q is a common factor of 2^t-1 and N, and the gcd below is not 1.
     #
     # Conversely, prime N will pass this test, unless 2^t ≡ 1 mod N.  (The
     # exceptional case should be rare: if N is prime, then there are t solutions
     # of x^t ≡ 1 mod N, and a randomly choosen x has probability 1/p of being an
     # exception).
-    if math.gcd(pow(2, t, N) - 1, N) != 1:
-        return False
-
-    return True
+    return math.gcd(pow(2, t, N) - 1, N) == 1
 
 bertha: Sequence[int]|None = None
 

@@ -388,8 +388,9 @@ if __name__ == '__main__':
     #  800000, base len 31905, sieve 2539, elim  729, total 3270
     #  700000, base len 28165, sieve 2660. elim  551, total 3213
     #  600000, 24473, 2875, 384, 3260
-    s = Sieve(618970019644176682696314337 * 1237940039291550758926781041, k=1,
-              maxB = int(sys.argv[1]))
+    #s = Sieve(618970019644176682696314337 * 1237940039291550758926781041, k=1,
+    #          maxB = int(sys.argv[1]))
+    s = Sieve(523022617466601111760007224100074291200000001, k=1, maxB = int(sys.argv[1]))
 
     for sb in s.blocks:
         assert len(sb.strides) == len(sb.pos_offset)

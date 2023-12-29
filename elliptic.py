@@ -115,9 +115,11 @@ class MontgomeryCurve:
         X1, Z1 = Q.X, Q.Z
 
         # The affine coordinate of the result r is given by
+        #
         # r·n = (p·q - 1)² / (p - q)².
 
         # Doing this projectively, we get four multiplies and two squarings:
+        #
         # r·n = (X₀·X₁ - Z₀·Z₁)² / (X₀·Z₁ - Z₀·X₁)²
         #
         # But we can save some multiplications:

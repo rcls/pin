@@ -38,9 +38,9 @@ class Mersenne:
         return s
 
     def is_prime(self) -> bool:
-        # Let n = 2ᵖ-1.  Work in ℤₙ[√3].  Jacobi (3|n) = -(3|n) = -1 as p is
-        # odd.  So if n is prime, then 3 is not a q.r. & the extension is a
-        # quadratic field.
+        # Let n = 2ᵖ-1.  Work in ℤₙ[√3].  As p is odd, 2ᵖ-1 ≡ 1 (mod 3) and ≡ 3
+        # mod 4, so that Jacobi (3|n) = -(n|3) = -1.  So 3 is not a q.r. mod n,
+        # and if n is prime then the extension is a quadratic field.
         #
         # 2 has a square root mod n, since 2ᵖ⁺¹ ≡ 2 and p+1 is even.
         #
@@ -59,8 +59,8 @@ class Mersenne:
         #
         # Let q be the smallest prime factor of n, so that q² < 2ᵖ.
         #
-        # Now, S(p-2) ≡ 0 (mod q) also.  Work in the ring ℤ_q[√3], and let 𝜔 =
-        # 2 + √3 as before.
+        # Now, S(p-2) ≡ 0 (mod q) also.  Work in the ring ℤ_q[√3], and let
+        # 𝜔 = 2 + √3 as before.
         #
         # 𝜔^(2ᵖ⁻²) + ◌̅𝜔^(2ᵖ⁻²) ≡ S(p-2) ≡ 0, so 𝜔^(2ᵖ⁻²) = -◌̅𝜔^(2ᵖ⁻²).
         #
@@ -74,10 +74,10 @@ class Mersenne:
 
 mersennes = (
     2, 3, 5, 7, 13, 17, 19, 31, 61, 89, 107, 127, 521, 607, 1279, 2203, 2281,
-    3217, 4253, 4423, 9689, 9941, 11213, 19937, 21701, 23209, 44497,
-    86243, 110503, 132049, 216091, 756839, 859433, 1257787, 1398269, 2976221,
-    3021377, 6972593, 13466917, 20996011, 24036583, 25964951, 30402457,
-    32582657, 37156667, 42643801, 43112609, 57885161)
+    3217, 4253, 4423, 9689, 9941, 11213, 19937, 21701, 23209, 44497, 86243,
+    110503, 132049, 216091, 756839, 859433, 1257787, 1398269, 2976221, 3021377,
+    6972593, 13466917, 20996011, 24036583, 25964951, 30402457, 32582657,
+    37156667, 42643801, 43112609, 57885161, 74207281, 77232917, 82589933)
 
 def test_mersennes() -> None:
     import joblib
@@ -100,3 +100,7 @@ def test_non_mersennes() -> None:
 #print(misc.timecall(pow, 2, m11213.N-1, m11213.N))
 #
 #print(misc.timecall(Mersenne(44497).is_prime))
+if __name__ == '__main__':
+    import sys, misc
+    for s in sys.argv[1:]:
+        print(s, misc.timecall(Mersenne(eval(s)).is_prime))

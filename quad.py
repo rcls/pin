@@ -56,12 +56,14 @@ class QuadRing:
         overshoot = pow(n, -1, p) * root % p * root % p # ≡ n^{Q+1} / n = n^Q.
         assert overshoot == pow(n, self.Q, p)
         twos = self.S - 1
-        # From the fact that n is a q.r...
+        # From the fact that n is a q.r., we have that the multiplicative order
+        # of overshoot is a power of two, bounded by self.S-1.
         assert pow(overshoot, 1 << twos, p) == 1
         assert root * root % p == overshoot * n % p
         while overshoot != 1:
             raised = overshoot
-            # We should need a smaller value for twos on each iteration.
+            # Find `twos` such that overshoot^(2^twos) ≡ -1.  This should get a
+            # smaller on each successive iteration.
             for twos in range(twos):
                 if p - raised == 1:
                     break
@@ -70,8 +72,13 @@ class QuadRing:
             else:
                 assert False, 'Failed to steer...'
 
+            # Find multiplier such that multiplier^(2^(twos+1)) ≡ -1,
+            # i.e., multiplier^(2^twos) is a square-root of -1.
             multiplier = self.square_chain(self.S - 2 - twos)
             assert p - pow(multiplier, 2 << twos, p) == 1
+            # Multiply root by multiplier, and hence to maintain our invariants,
+            # multiply overshoot by multiplier².  This reduces the
+            # multiplicative order of overshoot.
             overshoot = overshoot * multiplier % p * multiplier % p
             root = root * multiplier % p
             assert pow(overshoot, 1 << twos, p) == 1
@@ -180,6 +187,61 @@ class QuadInt:
             Fraction(self.r, 1), Fraction(self.q, 1),
             f' √{self.k.non_residue} ') + f' (mod {self.k.p})'
 
+# Test helper.
+def check_square_sqrt(q: QuadRing, x: int) -> None:
+    s = q.maybe_sqrt(x)
+    assert s is not None
+    assert misc.jacobi(x, q.p) >= 0
+    assert s == q.sqrt(x)
+    ss = s * s % q.p
+    assert ss == x % q.p
+    #if s * 2 > q.p:
+    #    s -= q.p
+
+def test_137() -> None:
+    q137 = QuadRing(137)
+    print(f'{q137=!s}')
+    assert q137.is_qr(1)
+    assert q137.maybe_sqrt(1) == 1
+
+    sqrtm1 = q137.maybe_sqrt(-1)
+    assert sqrtm1 is not None
+    check_square_sqrt(q137, sqrtm1)
+    assert q137.is_qr(2)
+    check_square_sqrt(q137, 2)
+    assert misc.jacobi(3, 137) == -1
+    assert not q137.is_qr(3)
+    assert q137.maybe_sqrt(3) == None
+    print(f'{q137=!s}')
+
+    assert not QuadRing(139).is_qr(-1)
+
+def test_12_64() -> None:
+    q12s64p1 = QuadRing((12 << 64) + 1)
+    print(f'{q12s64p1=}')
+    check_square_sqrt(q12s64p1, 2)
+    check_square_sqrt(q12s64p1, 3)
+    check_square_sqrt(q12s64p1, -3)
+    assert q12s64p1.maybe_sqrt(5) is None
+    assert misc.jacobi(5, q12s64p1.p) == -1
+    check_square_sqrt(q12s64p1, -1)
+
+def test_3_64() -> None:
+    q3s64m1 = QuadRing((3 << 64) - 1)
+    assert misc.jacobi(2, q3s64m1.p)
+    check_square_sqrt(q3s64m1, 2)
+    print(f'{q3s64m1.qsqrt(2)=!s}')
+    print(f'{q3s64m1.maybe_sqrt(3)=}')
+    print(f'{q3s64m1.qsqrt(-3)=!s}')
+    check_square_sqrt(q3s64m1, 3)
+    def square(x: QuadInt) -> QuadInt: return x*x
+    print(f'{-square(q3s64m1.qsqrt(-3))=!s}')
+    assert -square(q3s64m1.qsqrt(-3)) == QuadInt(3, 0, q3s64m1)
+    print(q3s64m1)
+    r = q3s64m1.p * q3s64m1.p - 1
+    print(f'{r:#x}', f'{QuadInt(3,4,q3s64m1).pow(r)=!r}')
+    assert QuadInt(3,4,q3s64m1).pow(r) == QuadInt(1, 0, q3s64m1)
+
 if __name__ == '__main__':
     import sys
     if len(sys.argv) > 1:
@@ -188,51 +250,3 @@ if __name__ == '__main__':
         for s in sys.argv[1:-1]:
             v = eval(s)
             print(f'sqrt({s}) mod {bs} = {b.maybe_sqrt(v)}')
-    else:
-        q137 = QuadRing(137)
-        print(f'{q137=!s}')
-        assert q137.is_qr(1)
-        assert q137.maybe_sqrt(1) == 1
-        def square_sqrt(q: QuadRing, x: int) -> None:
-            s = q.maybe_sqrt(x)
-            assert s is not None
-            assert misc.jacobi(x, q.p) >= 0
-            assert s == q.sqrt(x)
-            ss = s * s % q.p
-            assert ss == x % q.p
-            if s * 2 > q.p:
-                s -= q.p
-            #return s
-
-        sqrtm1 = q137.maybe_sqrt(-1)
-        assert sqrtm1 is not None
-        square_sqrt(q137, sqrtm1)
-        assert q137.is_qr(2)
-        square_sqrt(q137, 2)
-        assert misc.jacobi(3, 137) == -1
-        assert not q137.is_qr(3)
-        assert q137.maybe_sqrt(3) == None
-        print(f'{q137=!s}')
-
-        assert not QuadRing(139).is_qr(-1)
-
-        q12s64p1 = QuadRing((12 << 64) + 1)
-        square_sqrt(q12s64p1, 2)
-        square_sqrt(q12s64p1, 3)
-        square_sqrt(q12s64p1, -3)
-        assert q12s64p1.maybe_sqrt(5) is None
-        assert misc.jacobi(5, q12s64p1.p) == -1
-        square_sqrt(q12s64p1, -1)
-        print(q12s64p1)
-
-        q3s64m1 = QuadRing((3 << 64) - 1)
-        assert misc.jacobi(2, q3s64m1.p)
-        square_sqrt(q3s64m1, 2)
-        print(f'{q3s64m1.qsqrt(2)=!s}')
-        print(f'{q3s64m1.maybe_sqrt(3)=}')
-        def square(x: QuadInt) -> QuadInt: return x*x
-        print(f'{q3s64m1.qsqrt(-3)=!s}')
-        print(f'{-square(q3s64m1.qsqrt(-3))=!s}')
-        print(q3s64m1)
-        r = q3s64m1.p * q3s64m1.p - 1
-        print(f'{r:#x}', f'{QuadInt(3,4,q3s64m1).pow(r)=!r}')

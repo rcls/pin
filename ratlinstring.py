@@ -5,6 +5,8 @@ from numbers import Rational
 from fractions import Fraction
 
 def simple(n: int, d: int) -> str|None:
+    if n == 1 and d == 10:
+        return '⅒ '
     if n == 1 and d <= 10:
         return '01½⅓¼⅕⅙⅐⅛⅑⅒'[d]
     if n + 1 == d and 2 <= d <= 6:
@@ -39,7 +41,10 @@ def rational(f: Rational, k:str = '') -> str:
     k = k.strip()
     if an == 1 and k != '':
         return f'{sign}{k}{sp}/{sp}{d}'.lstrip()
-    return f'{n}{sp}{k}{sp}/{sp}{d}'
+    if sp == '':
+        return f'{n}{k}/{d}' #{sp}{k}{sp}/{sp}{d}'
+    else:
+        return f'{n}/{d} {k}' #{sp}{k}{sp}/{sp}{d}'
 
 def ratlin_basic(a: Rational, b: Rational, k: str) -> str:
     if b == 0:
@@ -56,8 +61,10 @@ def ratlin_basic(a: Rational, b: Rational, k: str) -> str:
 
 def factorout(o: Fraction, a: Rational, b: Rational, k: str) -> str:
     inner = ratlin_basic(a / o, b / o, k)
+    if o.numerator == 1 and o.denominator == 1:
+        return inner
     if '+' in inner or '-' in inner:
-        inner = '(' + inner + ') '
+        inner = '(' + inner + ')'
     else:
         inner = ' ' + inner + ' '
     return rational(o, inner)
@@ -67,13 +74,13 @@ def ratlinstring(a: Rational, b: Rational, k: str) -> str:
     # Try taking out various factors:
     an, ad = abs(a.numerator), a.denominator
     bn, bd = abs(b.numerator), b.denominator
-    result = ratlin_basic(a, b, k)
-    for on in lcm(an, bn), max(an, bn), min(an, bn), gcd(an, bn), 1:
-        for od in lcm(ad, bd), max(ad, bd), min(ad, bd), gcd(ad, bd), 1:
+    result = None
+    for on in gcd(an, bn), 1, min(an, bn), max(an, bn), lcm(an, bn):
+        for od in gcd(ad, bd), 1, min(ad, bd), max(ad, bd), lcm(ad, bd):
             if on != 0 and od != 0:
-                for son in on, -on:
+                for son in -on, on:
                     attempt = factorout(Fraction(son, od), a, b, k)
-                    if len(attempt) < len(result):
+                    if result == None or len(attempt) < len(result):
                         result = attempt
     return result
 

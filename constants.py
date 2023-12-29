@@ -107,8 +107,9 @@ def test_verify_parallel(limit: int = 30000) -> None:
         for func in (verify_one_fermat, verify_one_sub))
 
 def regenerate(bits: int, low16: int, wraps: int = 0) -> None:
+    import pocklington
     subbits = (bits + 3) // 2
-    p = prime_by_bits[subbits]
+    p = pocklington.pocklington_parallel(subbits)
     start_t = (1 << bits-1) // p
     t = (start_t & -65536) + low16
     if t < start_t:
@@ -123,7 +124,7 @@ def generate(bits: int) -> None:
     #if bits in prime_by_bits:
     #    return
     import pocklington
-    prime = pocklington.pocklington_serial(bits)
+    prime = pocklington.pocklington_parallel(bits)
     subbits = (bits + 3) // 2
     p = prime_by_bits[subbits]
     start_t = (1 << bits-1) // p
@@ -139,3 +140,11 @@ def generate(bits: int) -> None:
 if __name__ == '__main__':
     import sys
     regenerate(int(sys.argv[1]), int(sys.argv[2]))
+
+
+# 20000 32684
+# 10001 50358
+# 5002 28098 -> 2181
+# 2502 34806 -> 382
+# 1252 34238 -> 114
+
