@@ -42,31 +42,33 @@ class Mersenne:
         # mod 4, so that Jacobi (3|n) = -(n|3) = -1.  So 3 is not a q.r. mod n,
         # and if n is prime then the extension is a quadratic field.
         #
-        # 2 has a square root mod n, since 2ᵖ⁺¹ ≡ 2 and p+1 is even.
+        # 2 has an inverse square root mod n, since 2ᵖ⁻¹·2 = 2ᵖ ≡ 1 and p-1 is
+        # even.
         #
-        # Let 𝛼 = (1 + √3)/√2, so that 𝛼◌̅𝛼 = -1.  Let 𝜔 = 𝛼² = 2 + √3, so that
-        # 𝜔◌̅𝜔 = 1 and 𝜔+◌̅𝜔 = 4.
+        # Let 𝛼 = (1 + √3)/√2, so that 𝛼·𝛼̅ = -1.  Let 𝜔 = 𝛼² = 2 + √3, so that
+        # 𝜔·𝜔̅ = 1 and 𝜔+𝜔̅ = 4.
         #
-        # By induction, S(k) ≡ 𝜔^(2ᵏ) + ◌̅𝜔^(2ᵏ) = 𝛼^(2ᵏ⁺¹) + ◌̅𝛼^(2ᵏ⁺¹) for all
-        # k.
+        # By induction, the function S above has
+        # S(k) ≡ 𝜔^(2ᵏ) + 𝜔̅^(2ᵏ) = 𝛼^(2ᵏ⁺¹) + 𝛼̅^(2ᵏ⁺¹) for all k.
         #
-        # If n is prime, then using Frobenius, 𝛼^(2ᵖ) = 𝛼ⁿ·𝛼 = ◌̅𝛼·𝛼 = -1, and
+        # If n is prime, then using Frobenius, 𝛼^(2ᵖ) = 𝛼·𝛼ⁿ = 𝛼·𝛼̅ = -1, and
         # so:
         #
-        # S(p-2) = 𝛼^(2ᵖ⁻¹) + ◌̅𝛼^(2ᵖ⁻¹) = ◌̅𝛼^(2ᵖ⁻¹)·(𝛼^(2ᵖ) + 1) = 0
+        # S(p-2) = 𝛼^(2ᵖ⁻¹) + 𝛼̅^(2ᵖ⁻¹) = 𝛼̅^(2ᵖ⁻¹)·(𝛼^(2ᵖ) + 1) = 0
+        #
+        # (alt. S(p-1) = 𝛼ⁿ⁺¹ + 𝛼̅ⁿ⁺¹ = 2·𝛼·𝛼̅ = -2, so S(p-2)² = 0,
+        #  and S(p-2) = 0.)
         #
         # Conversely, suppose that S(p-2) ≡ 0 (mod n) but n is composite.
         #
         # Let q be the smallest prime factor of n, so that q² < 2ᵖ.
         #
-        # Now, S(p-2) ≡ 0 (mod q) also.  Work in the ring ℤ_q[√3], and let
-        # 𝜔 = 2 + √3 as before.
+        # Now, S(p-2) ≡ 0 (mod q) also.  Work in ℤ_q[√3] (which may be just
+        # ℤ_q), and let 𝜔 = 2 + √3 as before.
         #
-        # 𝜔^(2ᵖ⁻²) + ◌̅𝜔^(2ᵖ⁻²) ≡ S(p-2) ≡ 0, so 𝜔^(2ᵖ⁻²) = -◌̅𝜔^(2ᵖ⁻²).
+        # 𝜔^(2ᵖ⁻²) + 𝜔̅^(2ᵖ⁻²) ≡ S(p-2) ≡ 0, so 𝜔^(2ᵖ⁻²) = -𝜔̅^(2ᵖ⁻²), and
         #
-        # Using 𝜔 = 1/◌̅𝜔 we get
-        #
-        # 𝜔^(2ᵖ⁻¹) = 𝜔^(2ᵖ⁻²) / ◌̅𝜔^(2ᵖ⁻²) = -1,
+        # 𝜔^(2ᵖ⁻¹) = -𝜔^(2ᵖ⁻²)·𝜔̅^(2ᵖ⁻²) =  -(𝜔·𝜔̅)^(2ᵖ⁻²) = -1,
         #
         # so that the multiplicative mod q order of 𝜔 is 2ᵖ > q² ≥ #ℤ_q[√3],
         # which is impossible.

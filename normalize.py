@@ -50,6 +50,33 @@ class Quadratic:
         return Quadratic(self.r * n, self.q * n, self.b)
     def __repr__(self) -> str:
         return ratlinstring(self.r, self.q, f'√{self.b} ')
+    def __lt__(self, other) -> bool:
+        return (other - self).is_positive()
+    def __gt__(self, other) -> bool:
+        return (self - other).is_positive()
+    def __le__(self, other) -> bool:
+        return (other - self).is_non_negative()
+    def __ge__(self, other) -> bool:
+        return (self - other).is_non_negative()
+    def is_non_negative(self):
+        if self.r >= 0:
+            if self.q >= 0:
+                return True
+            return self.r * self.r - self.q * self.q * self.b >= 0
+        else:
+            if self.q < 0:
+                return False
+            return self.q * self.q * self.b - self.r * self.r >= 0
+    def is_positive(self):
+        if self.r >= 0:
+            if self.q > 0:
+                return True
+            return self.r * self.r - self.q * self.q * self.b > 0
+        else:
+            if self.q <= 0:
+                return False
+            return self.q * self.q * self.b - self.r * self.r > 0
+
 
 # ax+b / cx+d
 @dataclass(frozen=True)

@@ -19,6 +19,8 @@ def simple(n: int, d: int) -> str|None:
         return str(n)
     return None
 
+#⅕(175 + 78√5)
+#35 + 78/5 √5
 def rational(f: Rational, k:str = '') -> str:
     n, d = f.numerator, f.denominator
     sign = '-' if n < 0 else ''
